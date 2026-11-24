@@ -159,6 +159,11 @@ export const ch03: Chapter = {
     {
       id: 'positional-encoding', title: 'Positions & RoPE', minutes: 7, level: 'intermediate',
       summary: 'Attention is order-blind; positional information has to be injected. Rotary embeddings are today\'s default.',
+      quiz: [
+        { q: 'Why does a transformer need positional information?', options: ['Attention is too slow without it', 'Attention alone treats the input as an unordered set', 'Tokenizers drop word order', 'Softmax needs it'], answer: 1, why: 'Without positions, \'dog bites man\' and \'man bites dog\' look the same to attention.' },
+        { q: 'What does RoPE encode in the query-key dot product?', options: ['Absolute position only', 'Relative distance between tokens', 'Token frequency', 'Sentence boundaries'], answer: 1, why: 'Rotating Q and K by position makes their dot product depend on relative distance.' },
+        { q: 'A model extended from 8K to 128K context performs poorly at 100K. What is the first check?', options: ['Raise temperature', 'Evaluate retrieval at the lengths you use and confirm the serving RoPE scaling matches the checkpoint', 'Switch tokenizer', 'Disable the KV cache'], answer: 1, why: 'Past-trained lengths and mismatched rope_scaling degrade quality silently.' },
+      ],
       notes: {
         key: [
           'Without positional information, attention treats the input as a <b>set</b>: “dog bites man” = “man bites dog”.',
@@ -183,6 +188,11 @@ export const ch03: Chapter = {
     {
       id: 'transformer-block', title: 'The Transformer Block', minutes: 8, level: 'intermediate',
       summary: 'Attention + MLP + residuals + normalisation, stacked N times: the repeating unit of every LLM.',
+      quiz: [
+        { q: 'What carries information through all layers of a transformer?', options: ['The attention mask', 'The residual stream', 'The LM head', 'The tokenizer'], answer: 1, why: 'Each sub-layer reads from the residual stream and adds its update back.' },
+        { q: 'In a dense transformer, where do most parameters sit?', options: ['Embeddings', 'The MLP (feed-forward) layers', 'Layer norms', 'Attention softmax'], answer: 1, why: 'The MLP holds roughly two thirds of the parameters in dense models.' },
+        { q: 'Sizing GPUs for an MoE model, which parameter count sets memory?', options: ['Active parameters', 'Total parameters', 'Parameters per head', 'Vocabulary size'], answer: 1, why: 'All experts must be in memory; active parameters set compute, not memory.' },
+      ],
       notes: {
         key: [
           'A decoder block: <code>x = x + Attn(Norm(x))</code> then <code>x = x + MLP(Norm(x))</code> (pre-norm, used by most modern LLMs).',
@@ -209,6 +219,11 @@ export const ch03: Chapter = {
     {
       id: 'long-context', title: 'Long Context', minutes: 7, level: 'advanced',
       summary: 'What really happens at 200K+ tokens: cost, latency, recall in the middle, and when RAG still wins.',
+      quiz: [
+        { q: 'What makes repeated long prompts cheap and fast?', options: ['Higher temperature', 'Prompt caching of a stable prefix', 'More output tokens', 'Smaller vocabularies'], answer: 1, why: 'Cached prefixes skip recomputation and are billed at a lower rate.' },
+        { q: 'Why can stuffing the whole corpus into context hurt?', options: ['Models refuse long inputs', 'Cost and latency grow and distractors reduce accuracy', 'It disables tool use', 'Context is truncated silently by all APIs'], answer: 1, why: 'Every token is paid for and relevant-looking distractors lower accuracy.' },
+        { q: 'Where should the volatile user question go in a long prompt?', options: ['At the start', 'At the end, after stable cached material', 'In the system prompt', 'Repeated in every section'], answer: 1, why: 'Stable material first allows caching; the changing question goes last.' },
+      ],
       notes: {
         key: [
           'Long context removes the need to choose what to retrieve, but you pay for every input token on every call (unless it is cached).',

@@ -108,6 +108,11 @@ export const ch04: Chapter = {
     {
       id: 'training-pipeline', title: 'Pre-training → SFT → Preference Tuning', minutes: 8, level: 'intermediate',
       summary: 'How a base model becomes an assistant: pre-training, instruction tuning, RLHF/DPO and RL for reasoning.',
+      quiz: [
+        { q: 'Where does most of an LLM\'s knowledge come from?', options: ['Supervised fine-tuning', 'Pre-training', 'RLHF', 'The system prompt'], answer: 1, why: 'Pre-training on huge corpora provides knowledge; post-training shapes behaviour.' },
+        { q: 'What does DPO remove compared with classic RLHF?', options: ['Preference data', 'A separate reward model and RL loop', 'The base model', 'Tokenization'], answer: 1, why: 'DPO learns directly from preference pairs.' },
+        { q: 'A team wants the model to know this week\'s prices. What fits best?', options: ['Fine-tuning', 'Retrieval at answer time', 'RLHF', 'A larger context window alone'], answer: 1, why: 'Use retrieval for changing knowledge; fine-tuning for format and behaviour.' },
+      ],
       notes: {
         key: [
           '<b>Pre-training</b>: next-token prediction on trillions of tokens of web, code and books. Produces a base model with broad knowledge but no assistant behaviour.',
@@ -135,6 +140,11 @@ export const ch04: Chapter = {
     {
       id: 'mixture-of-experts', title: 'Mixture of Experts', minutes: 6, level: 'advanced',
       summary: 'Sparse models route each token to a few expert MLPs: big capacity, smaller compute per token.',
+      quiz: [
+        { q: 'What does the router in an MoE layer do?', options: ['Routes requests to GPUs', 'Sends each token to its top-k expert MLPs', 'Chooses the model version', 'Balances HTTP load'], answer: 1, why: 'Only a few experts run per token, so compute is lower than total size suggests.' },
+        { q: 'What sets an MoE model\'s GPU memory needs?', options: ['Active parameters', 'Total parameters', 'Number of layers only', 'Context length only'], answer: 1, why: 'All experts must be loaded even though only some run per token.' },
+        { q: 'What hurts MoE throughput at high batch sizes?', options: ['Low temperature', 'Load imbalance across experts', 'Short prompts', 'Prompt caching'], answer: 1, why: 'Overloaded experts become stragglers.' },
+      ],
       notes: {
         key: [
           'An MoE layer replaces the dense MLP with many expert MLPs and a <b>router</b> that sends each token to the top-k experts (often 2 or 8).',
@@ -158,6 +168,11 @@ export const ch04: Chapter = {
     {
       id: 'model-selection', title: 'Choosing a Model', minutes: 7, level: 'beginner',
       summary: 'Frontier vs small, open vs closed, hosted vs self-hosted: a decision framework driven by evals.',
+      quiz: [
+        { q: 'What should drive model choice first?', options: ['Public leaderboards', 'Your own eval set on quality, latency and cost', 'Parameter count', 'Release date'], answer: 1, why: 'Only your tasks and data show which model is good enough.' },
+        { q: 'A recommended way to find the cheapest adequate model?', options: ['Start with the smallest and stop when it fails', 'Set a quality ceiling with the strongest model, then try cheaper ones against that bar', 'Pick the median price', 'Use one model for every task'], answer: 1, why: 'The strong model defines the bar the cheaper models must meet.' },
+        { q: 'Why keep model choice behind a gateway or interface?', options: ['It speeds up tokenization', 'So you can switch models per task and on new versions without code changes', 'It is required by providers', 'It removes the need for evals'], answer: 1, why: 'Model churn is constant; an interface keeps switching cheap.' },
+      ],
       notes: {
         key: [
           'Dimensions: task quality (your evals), latency (TTFT and tokens/s), cost, context length, modality, tool-use reliability, data governance, deployment options, and licence.',
