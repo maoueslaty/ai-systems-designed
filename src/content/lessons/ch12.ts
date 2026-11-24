@@ -1,5 +1,8 @@
-import type { Chapter, Scene } from '../types';
+import type { Chapter, DecisionRecord, Lesson, SEdge, SNode, Scene } from '../types';
 import { A, C, E, F, N, S } from '../dsl';
+import { bars, code, kv, pin, scener } from './pat_traffic';
+
+const dec12 = (o: Partial<DecisionRecord> & { context: string; decision: string; cto: string }): DecisionRecord => ({ options: [], consequences: [], ...o });
 
 // ── LLMOps: the gateway and observability ──
 const teams = ['Claims app', 'Support bot', 'Analytics'].map((l, i) => N(`t${i}`, 0, i * 4.4, { label: l, glyph: 'server', tone: 'blue', w: 1.2, d: 1.2, h: 0.8 }));
@@ -29,13 +32,144 @@ const s5: Scene = S([...teams, GW, M1, M2, M3, CACHE], [...toGw, ...toM, E('gw-c
   widgets: [{ type: 'kv', id: 'cache', x: 0, y: 0, title: 'caching layers', rows: [['provider prompt cache', 'stable prefixes'], ['exact response cache', 'repeated FAQs'], ['scope keys by', 'tenant + model + prompt version', 'amber']] }] });
 const s6: Scene = S([...teams, GW, M1, M2, M3, CACHE, OBS], [...toGw, ...toM, E('gw-c', 'gw', 'cache', { both: true }), E('gw-o', 'gw', 'obs', { dashed: true, via: [[5.4, 13], [16, 13]], label: 'OpenTelemetry spans' })],
   [...toGw.map(e => F(e.id, 'req', 0.7)), F('gw-m1', 'req', 0.6), F('gw-m2', 'req', 0.8), F('gw-o', 'trace', 1.4)], {
-    widgets: [{ type: 'code', id: 'span', x: 0, y: 0, title: 'one span per model call (OTel GenAI conventions)', lines: ['gen_ai.operation.name   = "chat"', 'gen_ai.request.model    = "…"', 'gen_ai.usage.input_tokens  = 3412', 'gen_ai.usage.output_tokens = 287', 'app.tenant = "acme"  app.prompt_version = "claims-v14"'] }] });
+    widgets: [{ type: 'code', id: 'span', x: 0, y: 0, title: 'one span per model call (OTel GenAI, Development status)', lines: ['gen_ai.operation.name   = "chat"', 'gen_ai.request.model    = "…"', 'gen_ai.usage.input_tokens  = 3412', 'gen_ai.usage.output_tokens = 287', 'app.tenant = "acme"  app.prompt_version = "claims-v14"'] }] });
 const s7: Scene = S([...teams, GW, M1, M2, M3, CACHE, OBS, REG], [...toGw, ...toM, E('gw-o', 'gw', 'obs', { dashed: true, via: [[5.4, 13], [16, 13]] }), E('r-g', 'reg', 'gw', { label: 'claims-v15, 5% canary' })],
   [F('r-g', 'msg', 0.6), ...toGw.map(e => F(e.id, 'req', 0.6)), F('gw-m1', 'req', 0.7), F('gw-o', 'trace', 1)], {
     widgets: [{ type: 'kv', id: 'reg', x: 0, y: 0, title: 'prompts are deployable artifacts', rows: [['versioned', 'claims-v14 → v15'], ['gated', 'offline evals pass'], ['rolled out', '5% → 50% → 100%'], ['rolled back', 'one config change', 'green']] }] });
 const s8: Scene = S([...teams, GW, M1, M2, M3, CACHE, OBS, REG].map(n => (n.id === 'obs' ? { ...n, state: 'hot' as const } : n)), [...toGw, ...toM, E('gw-o', 'gw', 'obs', { dashed: true, via: [[5.4, 13], [16, 13]] })],
   [...toGw.map(e => F(e.id, 'req', 0.6)), F('gw-m1', 'req', 0.6), F('gw-o', 'trace', 1.2)], {
     widgets: [{ type: 'kv', id: 'alarms', x: 0, y: 0, title: 'what to alarm on', rows: [['error / throttle rate', '> 2%'], ['p95 latency', '> SLO'], ['cost per tenant', '> daily budget', 'amber'], ['online eval score', 'drop > 3 pts', 'red'], ['refusal / "not found" rate', 'sudden change']] }] });
+
+// ── Cost per outcome (v3 pattern lesson; all numbers illustrative) ──
+const Q: Record<string, SNode> = {
+  t: N('t', 0, 4.6, { kind: 'crowd', label: 'Tenants & features', w: 1.6, d: 1.4 }),
+  gw: N('gw', 4.6, 4.6, { label: 'Gateway', glyph: 'hash', tone: 'amber' }),
+  ca: A('ca', 4.6, 0, 'AmazonElastiCache', 'Cache'),
+  sm: A('sm', 9.2, 0, 'AmazonBedrock', 'Small model'),
+  fm: A('fm', 9.2, 4.6, 'AmazonBedrock', 'Frontier model'),
+  fx: A('fx', 9.2, 9.2, 'AmazonBedrock', 'Flex & batch'),
+  hu: N('hu', 13.8, 0, { kind: 'crowd', label: 'Human agents', w: 1.5, d: 1.3 }),
+  dash: A('dash', 0, 9.2, 'AmazonAthena', 'Cost per outcome'),
+};
+const QE: Record<string, SEdge> = {
+  't-gw': E('t-gw', 't', 'gw'), 'gw-ca': E('gw-ca', 'gw', 'ca', { both: true }), 'gw-sm': E('gw-sm', 'gw', 'sm'), 'gw-fm': E('gw-fm', 'gw', 'fm'),
+  'gw-fx': E('gw-fx', 'gw', 'fx'), 'sm-hu': E('sm-hu', 'sm', 'hu', { label: 'escalate' }), 'fm-hu': E('fm-hu', 'fm', 'hu'),
+  'gw-dash': E('gw-dash', 'gw', 'dash', { dashed: true, label: 'tagged usage' }),
+};
+const qv = scener(Q, QE, 'cost');
+const qAll = Object.keys(Q);
+const qAllE = Object.keys(QE);
+const qFlows = [F('t-gw', 'req', 1.4), F('gw-ca', 'res', 0.5, { reverse: true }), F('gw-sm', 'req', 1), F('gw-fm', 'req', 0.5), F('gw-fx', 'msg', 0.3), F('sm-hu', 'req', 0.2), F('fm-hu', 'req', 0.15), F('gw-dash', 'trace', 0.6)];
+const waterfall = bars('$ per resolved ticket as levers stack (illustrative)', [
+  { label: 'baseline', value: 3.1, tone: 'red' }, { label: '+ routing', value: 2.45, tone: 'amber' }, { label: '+ prompt', value: 2.15, tone: 'amber' },
+  { label: '+ semantic', value: 2.02, tone: 'amber' }, { label: '+ Flex', value: 1.94, tone: 'green' }, { label: '+ caps', value: 1.88, tone: 'green', hi: true }], '', 330);
+
+const costLesson: Lesson = {
+  id: 'cost-control', title: 'Cost Control: Cost per Outcome', minutes: 13, level: 'intermediate',
+  summary: 'Measure cost per resolved outcome, attribute every call to a tenant and feature, budget it, and apply routing, caching and tiers as one waterfall.',
+  playground: 'cost',
+  metrics: [{ id: 'cpo', label: 'cost / resolved ticket', icon: 'chart', good: 'low' }, { id: 'spend', label: 'monthly AI spend', icon: 'bolt', good: 'low' }, { id: 'attr', label: 'spend attributed', icon: 'eye', good: 'high' }],
+  legend: ['req', 'res', 'msg', 'trace'],
+  goals: [{ text: 'Why price per token is the wrong target', step: 1 }, { text: 'Attribution tags and budgets', step: 3 }, { text: 'The cost waterfall and its traps', step: 6 }],
+  steps: [
+    { short: 'The bill', tag: 'setup', title: 'A growing bill nobody can explain', metrics: { cpo: '?', spend: '$84K', attr: '0%' },
+      scene: qv(['t', 'gw', 'fm'], ['t-gw', 'gw-fm'], [F('t-gw', 'req', 1.4), F('gw-fm', 'req', 1.4)], {
+        widgets: [kv('the monthly review', [['AI spend', '$84K, up 30%', 'red'], ['which feature?', 'unknown', 'red'], ['which tenant?', 'unknown', 'red'], ['worth it?', 'no outcome data', 'red']])] }),
+      body: ['A support product spends $84K a month on models, up 30% in a quarter. Finance asks which feature and which tenant drive it, and whether it pays off. Nobody can answer. All numbers in this lesson are illustrative.'] },
+    { short: 'Token trap', tag: 'problem', title: 'Cheaper tokens, more expensive tickets', metrics: { cpo: '$3.60', spend: '$46K', attr: '0%' },
+      scene: qv(['t', 'gw', 'sm', 'hu'], ['t-gw', 'gw-sm', 'sm-hu'], [F('t-gw', 'req', 1.4), F('gw-sm', 'req', 1.4), F('sm-hu', 'req', 0.9, { text: ['unresolved'] })], {
+        patch: { hu: { state: 'hot', ...pin('escalations +40%', 'red', 'x') }, sm: pin('all traffic', 'amber') },
+        widgets: [bars('$ per resolved ticket', [{ label: 'frontier', value: 3.1, tone: 'amber' }, { label: 'cheap only', value: 3.6, tone: 'red', hi: true }])] }),
+      body: ['The first fix moves everything to a cheaper model. Model spend falls 45%, but fewer tickets get resolved, more go to human agents, and each resolved ticket now costs more. Price per token was the wrong target.'] },
+    { short: 'Outcome', tag: 'solution', title: 'Define the outcome, then its cost', metrics: { cpo: '$3.10', spend: '$84K', attr: '0%' },
+      scene: qv(['t', 'gw', 'fm', 'hu', 'dash'], ['t-gw', 'gw-fm', 'fm-hu', 'gw-dash'], [F('t-gw', 'req', 1.4), F('gw-fm', 'req', 1.4), F('fm-hu', 'req', 0.3), F('gw-dash', 'trace', 0.6)], {
+        patch: { dash: pin('$3.10 per resolved', 'blue', 'chart') },
+        widgets: [code('cost per outcome', ['outcome = ticket resolved, not reopened in 7 days', 'cost = model + retrieval + infra + human time', 'cost_per_outcome = cost / outcomes', '// agree the definition with the business'])] }),
+      body: ['Agree with the business what one outcome is: a resolved ticket, a processed claim, a qualified lead. <span class="term">Cost per outcome</span> adds model, retrieval, infrastructure and human time, divided by outcomes. Every later decision is judged against this number, with quality held constant.'] },
+    { short: 'Tags', tag: 'technique', title: 'Attribute every call: tenant, feature, version', metrics: { cpo: '$3.10', spend: '$84K', attr: '94%' },
+      scene: qv(['t', 'gw', 'fm', 'hu', 'dash'], ['t-gw', 'gw-fm', 'fm-hu', 'gw-dash'], [F('t-gw', 'req', 1.4), F('gw-fm', 'req', 1.4, { text: ['tenant=acme', 'feature=reply'] }), F('fm-hu', 'req', 0.3), F('gw-dash', 'trace', 0.8)], {
+        patch: { gw: pin('tenant, feature, prompt_v', 'amber', 'hash') },
+        widgets: [kv('attribution on Bedrock', [['per workload', 'application inference profiles + tags'], ['per caller', 'IAM principal in CUR 2.0'], ['per call', 'request metadata in invocation logs'], ['tag values', 'low cardinality only', 'amber']], 330)] }),
+      body: ['The gateway tags every call with tenant, feature and prompt version. On Bedrock, application inference profiles carry cost allocation tags per workload, IAM principal attribution puts the caller on each CUR 2.0 line, and request metadata gives per-call detail. Trace IDs belong in logs, not in cost tags.'] },
+    { short: 'Budgets', tag: 'technique', title: 'Budgets per tenant and feature', metrics: { cpo: '$3.10', spend: '$84K', attr: '94%' },
+      scene: qv(['t', 'gw', 'fm', 'hu', 'dash'], ['t-gw', 'gw-fm', 'fm-hu', 'gw-dash'], [F('t-gw', 'req', 1.4), F('gw-fm', 'req', 1.4), F('fm-hu', 'req', 0.3), F('gw-dash', 'trace', 0.6)], {
+        patch: { gw: pin('acme/reply: 80% used', 'amber', 'gear') },
+        widgets: [kv('budget rules', [['owner', 'one per feature'], ['alerts', '50 / 80 / 100%'], ['at 100%', 'degrade, do not block paying users', 'amber'], ['agent tasks', 'hard token cap per run']])] }),
+      body: ['Each feature gets an owner and a budget, with alerts at 50, 80 and 100% through AWS Budgets on the activated tags. Tenants get soft budgets that degrade; agent runs get hard caps. The token budgets lesson covers the mechanics.'] },
+    { short: 'Levers', tag: 'technique', title: 'The levers: route, cache, tier, trim', metrics: { cpo: '$2.10', spend: '$51K', attr: '94%' },
+      scene: qv(qAll, qAllE, qFlows, {
+        widgets: [kv('levers, typical order of impact', [['route / cascade', 'small model for easy traffic'], ['prompt caching', 'static prefixes'], ['semantic cache', 'safe repeated intents'], ['Flex / batch', 'work nobody waits on'], ['output caps', 'max_tokens, concise formats']], 320)] }),
+      body: ['The levers are the other patterns in this chapter. Routing and cascades move easy traffic to small models; caching removes repeated work; Flex and batch price offline work lower; output caps trim the most expensive tokens. Each lever is measured by cost per outcome, not by tokens saved.'] },
+    { short: 'Waterfall', tag: 'insight', title: 'The cost waterfall', metrics: { cpo: '$1.88', spend: '$47K', attr: '94%' },
+      scene: qv(qAll, qAllE, qFlows, { patch: { dash: pin('$1.88 per resolved', 'green', 'check') }, widgets: [waterfall] }),
+      body: ['Apply levers one at a time and record cost per resolved ticket after each, with evals passing. The waterfall shows which lever paid: routing, then prompt caching, semantic cache, Flex for offline work, output caps. Here the first two carry most of the saving.'] },
+    { short: 'Shifted', tag: 'tradeoff', title: 'Savings that move cost somewhere else', metrics: { cpo: '$1.88', spend: '$47K', attr: '94%' },
+      scene: qv(qAll, qAllE, qFlows, { patch: { dash: pin('$1.88 per resolved', 'green', 'check') } }),
+      inject: { label: 'router too aggressive', metrics: { cpo: '$2.40', spend: '$38K' },
+        note: 'To hit a token-spend target, someone lowers the router threshold. Model spend falls 20%, but more tickets reach human agents and cost per resolved ticket rises from $1.88 to $2.40.',
+        scene: qv(qAll, qAllE, [F('t-gw', 'req', 1.4), F('gw-sm', 'req', 1.8), F('gw-fm', 'req', 0.1), F('sm-hu', 'req', 1, { text: ['unresolved'] }), F('gw-dash', 'trace', 0.6)], {
+          patch: { sm: pin('92% of traffic', 'amber'), hu: { state: 'hot', ...pin('escalations +35%', 'red', 'x') }, dash: { state: 'warn', ...pin('$2.40 per resolved', 'red', 'chart') } } }) },
+      body: ['Every lever can push cost where you are not looking: to human agents, retries or churn. Put spend, quality and outcomes on one dashboard, and set targets on cost per outcome, never on tokens alone.'] },
+    { short: 'When not', tag: 'insight', title: 'When not to optimise', metrics: { cpo: '—', spend: '$3K', attr: '94%' },
+      scene: qv(['t', 'gw', 'fm', 'dash'], ['t-gw', 'gw-fm', 'gw-dash'], [F('t-gw', 'req', 0.8), F('gw-fm', 'req', 0.8), F('gw-dash', 'trace', 0.4)], { patch: { gw: pin('tag now, tune later', 'green', 'check') } }),
+      body: ['Before product fit, or at a few thousand dollars a month, cost engineering costs more than it saves: tag everything and watch, but do not tune. Where the outcome cannot be measured, use cost per active user and call it a proxy.'] },
+    { short: 'On AWS', tag: 'aws', title: 'AWS mapping and open-source options', metrics: { cpo: '$1.88', spend: '$47K', attr: '94%' },
+      scene: qv(qAll, qAllE, qFlows, {
+        widgets: [kv('building blocks', [['attribution', 'application inference profiles, IAM principal, CUR 2.0'], ['budgets', 'AWS Budgets, Cost Explorer'], ['per-call detail', 'invocation logs, CloudWatch'], ['analysis', 'Athena on CUR'], ['open source', 'LiteLLM spend tracking, Langfuse']], 340)] }),
+      body: ['Attribution from application inference profiles and IAM principal data in CUR 2.0, budgets in AWS Budgets, per-call detail in invocation logs, joined with outcome events in Athena. Open source: LiteLLM tracks spend per key and team; Langfuse tracks cost per trace.'] },
+    { short: 'Recap', tag: 'recap', title: 'Recap', metrics: { cpo: '$1.88', spend: '$47K', attr: '94%' },
+      scene: qv(qAll, qAllE, qFlows, { patch: { dash: pin('target: cost/outcome', 'blue', 'chart') } }),
+      body: ['Define the outcome, attribute every call, budget per owner, then apply levers one at a time and read the waterfall. Optimise cost per outcome with quality held constant, and watch for cost that moves to humans.'] },
+  ],
+  pattern: {
+    family: 'traffic',
+    problem: 'Spend grows with no owner, and price per token hides what an outcome costs.',
+    solution: 'Tag every call, budget per owner, apply levers one at a time against cost per outcome.',
+    failure: 'Token savings that shift cost to human agents, retries or lost customers.',
+    whenNot: 'Pre product fit or tiny spend: tag and watch, do not tune.',
+    aws: ['Application inference profiles', 'IAM principal cost attribution', 'AWS Budgets', 'Amazon Athena', 'AWS Cost Explorer'],
+    oss: ['LiteLLM', 'Langfuse'],
+    related: ['model-router-cascade', 'caching-strategies', 'token-budgets-tiers', 'batch-inference-pipeline', 'llm-gateway-observability'],
+  },
+  senior: dec12({
+    context: 'Finance wants AI spend cut 40% this quarter; product fears quality loss.',
+    options: [{ name: 'Mandate a cheaper model everywhere', verdict: 'Hits the token target, risks cost per outcome.' }, { name: 'Freeze new AI features', verdict: 'Stops growth, not waste.' }, { name: 'Attribute, then apply levers against cost per outcome', verdict: 'Slower start, savings that hold.' }],
+    decision: 'Two weeks to tag every call and agree the outcome definition; then routing and prompt caching first, each lever gated on evals and measured as cost per resolved ticket.',
+    consequences: ['Finance gets a per-feature view in a month', 'Some features turn out to be unprofitable and are redesigned', 'Quality owners sign off each lever'],
+    cto: 'We will cut what an outcome costs, not just what a token costs, and every saving will show its effect on quality.',
+  }),
+  quiz: [
+    { q: 'Model spend fell 45% but cost per resolved ticket rose. Most likely cause?', options: ['Billing error', 'Lower resolution rate pushed work to human agents', 'Prompt caching stopped', 'Higher token prices'], answer: 1, why: 'The outcome cost includes human time, which grew.' },
+    { q: 'Which value should not be a cost allocation tag?', options: ['feature', 'team', 'trace ID', 'environment'], answer: 2, why: 'High-cardinality values belong in request metadata and logs.' },
+    { q: 'Why apply cost levers one at a time?', options: ['AWS requires it', 'To see in the waterfall which lever actually paid, with quality checked each time', 'To reduce deployment risk only', 'Because levers conflict'], answer: 1, why: 'Measuring after each lever attributes the saving and catches quality drops.' },
+  ],
+  notes: {
+    key: [
+      'Cost per outcome = (model + retrieval + infrastructure + human time) / outcomes, with quality held constant.',
+      'Levers, roughly by impact: smaller model where possible (routing, cascades) → fewer input tokens (retrieval, compaction) → prompt caching → semantic cache on safe intents → Flex and batch for offline work → shorter outputs → reserved capacity at steady scale.',
+      'On Bedrock: application inference profiles carry cost allocation tags per workload; IAM principal attribution appears in CUR 2.0; request metadata gives per-call detail in invocation logs.',
+      'Agents and long conversations dominate spend because context is resent on every call.',
+    ],
+    practices: [
+      'Set per-tenant and per-feature budgets with alerts at 50/80/100%.',
+      'Review the top 20 most expensive traces weekly.',
+      'Use low-cardinality tag keys (tenant, feature, environment); keep trace IDs in logs.',
+      'Report cost per outcome next to quality metrics on one dashboard.',
+    ],
+    pitfalls: [
+      'Optimising price per token while ignoring tokens per task and the outcome rate.',
+      'Gateway calls under one shared role: all spend lands on one principal unless you tag requests.',
+      'Cost allocation tags that were never activated, so they never reach Cost Explorer.',
+    ],
+    fde: ['Bring a one-page waterfall to the steering meeting; it answers "what did each change buy us?" before anyone asks.'],
+    refs: [
+      { t: 'Amazon Bedrock pricing', u: 'https://aws.amazon.com/bedrock/pricing/' },
+      { t: 'Amazon Bedrock: Best practices for cost attribution', u: 'https://docs.aws.amazon.com/bedrock/latest/userguide/cost-mgmt-best-practices.html' },
+      { t: 'AWS: Granular cost attribution for Amazon Bedrock', u: 'https://aws.amazon.com/blogs/machine-learning/introducing-granular-cost-attribution-for-amazon-bedrock/' },
+      { t: 'AWS: Manage multi-tenant Bedrock costs with application inference profiles', u: 'https://aws.amazon.com/blogs/machine-learning/manage-multi-tenant-amazon-bedrock-costs-using-application-inference-profiles/' },
+    ],
+  },
+};
 
 export const ch12: Chapter = {
   id: 'llmops', num: '12', title: 'LLMOps', tone: 'amber',
@@ -69,7 +203,7 @@ export const ch12: Chapter = {
         { short: 'Tracing', tag: 'technique', title: 'Trace every call', scene: s6, metrics: { vis: 'per request', avail: 'multi-region', cost: '−62%' },
           changes: [{ sign: '+', text: 'OpenTelemetry spans to CloudWatch' }],
           body: ['Emit a <span class="term">span</span> per model call, retrieval and tool call, linked by one trace ID, with token counts, latency, model, prompt version and tenant.',
-            'OpenTelemetry\'s GenAI semantic conventions standardise the attribute names, so any backend can read them.'] },
+            'OpenTelemetry\'s GenAI semantic conventions name these attributes so any backend can read them. They are still <b>Development</b> status, so names can change: pin the version you emit.'] },
         { short: 'Versioning', tag: 'solution', title: 'Prompts are deployable artifacts', scene: s7, metrics: { vis: 'per request', avail: 'multi-region', cost: '−62%' },
           body: ['Store prompts in a registry with versions. A new version passes offline evals, then rolls out as a canary (5% → 50% → 100%) while online metrics are watched. Rollback is a config change.'] },
         { short: 'Alarms', tag: 'recap', title: 'Monitor quality, not just uptime', scene: s8, metrics: { vis: 'per request', avail: 'multi-region', cost: 'budgeted' },
@@ -94,31 +228,21 @@ export const ch12: Chapter = {
         ],
         fde: ['Hand over a dashboard the customer\'s ops team already knows how to read (CloudWatch, Grafana), not a new tool.'],
         refs: [
-          { t: 'OpenTelemetry GenAI semantic conventions', u: 'https://opentelemetry.io/docs/specs/semconv/gen-ai/' },
+          { t: 'OpenTelemetry GenAI semantic conventions (Development status)', u: 'https://github.com/open-telemetry/semantic-conventions-genai' },
           { t: 'Amazon Bedrock cross-region inference', u: 'https://docs.aws.amazon.com/bedrock/latest/userguide/cross-region-inference.html' },
           { t: 'AWS: Multi-provider generative AI gateway reference', u: 'https://aws.amazon.com/solutions/guidance/multi-provider-generative-ai-gateway-on-aws/' },
         ],
       },
     },
-    {
-      id: 'cost-control', title: 'Cost Control', minutes: 6, level: 'beginner',
-      summary: 'Where LLM spend comes from and the levers that reduce it, in order of impact.',
-      notes: {
-        key: [
-          'Levers, roughly by impact: smaller model where possible → fewer input tokens (retrieval, compaction) → prompt caching → shorter outputs → batch APIs for offline work → provisioned capacity at steady scale.',
-          'Agents and long conversations dominate spend because context is resent on every call.',
-        ],
-        practices: [
-          'Set per-tenant and per-feature budgets with alerts at 50/80/100%.',
-          'Review the top 20 most expensive traces weekly.',
-        ],
-        pitfalls: ['Optimising price per token while ignoring tokens per task.'],
-        refs: [{ t: 'Amazon Bedrock pricing', u: 'https://aws.amazon.com/bedrock/pricing/' }],
-      },
-    },
+    costLesson,
     {
       id: 'fine-tuning-ops', title: 'Fine-Tuning & Distillation Ops', minutes: 6, level: 'advanced',
       summary: 'When to customise a model, how to run it as a pipeline, and how to keep it from rotting.',
+      quiz: [
+        { q: 'When is fine-tuning worth its upkeep?', options: ['Whenever a new base model ships', 'When it beats a well-prompted base model on your evals by enough to pay for retraining and rollout', 'When prompts get long', 'Never on managed services'], answer: 1, why: 'A tuned model is a maintained artifact; it must earn that cost.' },
+        { q: 'What does distillation do?', options: ['Compresses prompts', 'Trains a smaller student on a larger teacher\'s outputs', 'Removes PII from data', 'Quantizes weights'], answer: 1, why: 'The student learns the teacher\'s behaviour for a narrower task at lower cost.' },
+        { q: 'Which risk is specific to fine-tuning on customer data?', options: ['Higher latency', 'PII leaking into model weights', 'Cache misses', 'Retry storms'], answer: 1, why: 'Data memorised in weights cannot be deleted like a database row.' },
+      ],
       notes: {
         key: [
           'Options: supervised fine-tuning, parameter-efficient methods (LoRA), and distillation from a large teacher into a smaller student.',
