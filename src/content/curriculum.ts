@@ -22,6 +22,7 @@ import { patternsTrust } from './lessons/pat_trust';
 import { patternsServing } from './lessons/pat_serving';
 import { STORY } from './story';
 import { EXTRAS } from './extras';
+import { EXTRAS_V3 } from './extras_v3';
 
 const RAW: Chapter[] = [ch00, ch01, ch02, ch03, ch04, ch05, ch06, ch07, ch08, ch09, ch10, ch11, ch12, ch13, ch14, patternsTraffic, patternsKnowledge, patternsAgents, patternsTrust, patternsServing, ch15];
 
@@ -29,7 +30,7 @@ const RAW: Chapter[] = [ch00, ch01, ch02, ch03, ch04, ch05, ch06, ch07, ch08, ch
 export const CHAPTERS: Chapter[] = RAW.filter(c => c.lessons.length > 0).map(c => ({
   ...c,
   story: c.story ?? STORY[c.id],
-  lessons: c.lessons.map(l => ({ ...l, ...(EXTRAS[l.id] ?? {}) })),
+  lessons: c.lessons.map(l => ({ ...(EXTRAS[l.id] ?? {}), ...(EXTRAS_V3[l.id] ?? {}), ...l })),
 }));
 
 export const hasPractice = (l: Lesson) => !!(l.quiz?.length || l.scenario || l.playground);

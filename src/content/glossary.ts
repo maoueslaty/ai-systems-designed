@@ -96,6 +96,15 @@ const BASE: Term[] = [
   { term: 'AIS program', def: 'The written AI Systems program the NAIC bulletin expects: governance, risk management, testing and third-party oversight for AI used in insurance decisions.', lesson: 'claims-governance' },
   { term: 'Task token', def: 'A Step Functions token that pauses a workflow until an external party, such as a person approving a step, calls back with a result.', lesson: 'claims-target-architecture' },
   { term: 'AWS End User Messaging Social', def: 'AWS service for WhatsApp Business messaging; inbound messages are published to an SNS topic.', lesson: 'claims-target-architecture' },
+  { term: 'Anti-corruption layer', alt: ['domain adapter'], def: 'A translation layer that turns a legacy system\'s formats and codes into a clean domain model, so new callers never see the legacy quirks.', lesson: 'claims-legacy-integration' },
+  { term: 'Read model', def: 'A copy of data shaped for fast reads, kept up to date from the source of truth by a change feed. Fine for display and triage; decisions re-read the source.', lesson: 'claims-legacy-integration' },
+  { term: 'Change data capture', alt: ['CDC'], def: 'Streaming every insert, update and delete from a database so other systems can stay in sync.', lesson: 'claims-legacy-integration' },
+  { term: 'Reconciliation', def: 'A scheduled comparison of records across systems that finds and routes mismatches, such as a payment that may or may not have happened.', lesson: 'claims-legacy-integration' },
+  { term: 'Confused deputy', def: 'A privileged component tricked into using its own rights on someone else\'s behalf; the classic risk of agents with broad service accounts.', lesson: 'claims-access-by-design' },
+  { term: 'On-behalf-of token', alt: ['token exchange'], def: 'A short-lived token an agent obtains for a specific user, scope and resource, so it can never do more than that user.', lesson: 'claims-access-by-design' },
+  { term: 'Cedar', def: 'An open-source policy language for authorization, used by Amazon Verified Permissions and AgentCore Policy.', lesson: 'claims-access-by-design' },
+  { term: 'Contextual grounding check', def: 'A guardrail that scores whether an answer is supported by the source passages and relevant to the question, and blocks it below a threshold.', lesson: 'claims-guardrail-layers' },
+  { term: 'Application inference profile', def: 'A Bedrock resource you call models through, tagged so that its usage and cost appear by application, stage or team in cost reports.', lesson: 'claims-cost-tracking' },
 ];
 
 export const GLOSSARY: Term[] = [...BASE, ...tTraffic, ...tKnowledge, ...tAgents, ...tTrust, ...tServing];

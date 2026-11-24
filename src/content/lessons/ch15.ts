@@ -118,7 +118,7 @@ const W: Record<string, SNode> = {
   claims: N('claims', 31.74, 4.6, { kind: 'cyl', label: 'Claims system', glyph: 'db', tone: 'slate' }),
   erp: N('erp', 31.74, 9.2, { kind: 'cyl', label: 'ERP (payments)', glyph: 'db', tone: 'slate' }),
   pricing: A('pricing', 21.16, 9.2, 'AmazonDynamoDB', 'Pricing tables'),
-  a2i: A('a2i', 10.58, 9.2, 'AmazonAugmentedAIA2I', 'Review (A2I)'),
+  a2i: N('a2i', 10.58, 9.2, { label: 'Adjuster workbench', glyph: 'user', tone: 'blue' }),
   adj: N('adj', 10.58, 13.8, { kind: 'crowd', label: 'Adjusters', w: 1.6, d: 1.4 }),
   appr: N('appr', 0, 13.8, { kind: 'crowd', label: 'Appraisers', w: 1.6, d: 1.4 }),
   eb: A('eb', 5.29, 9.2, 'AmazonEventBridge', 'Claim events'),
@@ -170,7 +170,7 @@ const c4s5 = V([...CORE, ...AI, ...LEG, ...HUM], [...coreE, ...aiE, ...legE, ...
   widgets: [{ type: 'kv', id: 'hum', x: 0, y: 0, title: 'humans are part of the architecture', rows: [['adjusters', 'review queue with AI drafts'], ['appraisers', 'claim pack by email or WhatsApp'], ['waiting', 'workflow pauses with a task token'], ['every decision', 'recorded with who and why']] }] });
 const c4s6 = V(ALLN, ALLE, [F('in-sfn', 'req', 0.5), F('sfn-br', 'req', 0.5), F('sfn-gw', 'tool', 0.5), F('sfn-a2i', 'msg', 0.4), F('eb-cw', 'trace', 1.2)], {
   zones: [onPrem],
-  widgets: [{ type: 'kv', id: 'all', x: 0, y: 0, title: 'the whole target architecture', rows: [['managed AWS services', '17'], ['new systems to operate', '0 (all managed)'], ['legacy changes', 'none in phase 1', 'green'], ['agents', 'one, inside investigation']] }] });
+  widgets: [{ type: 'kv', id: 'all', x: 0, y: 0, title: 'the whole target architecture', rows: [['managed AWS services', '16'], ['new systems to operate', '1 workbench app, rest managed'], ['legacy changes', 'none in phase 1', 'green'], ['agents', 'one, inside investigation']] }] });
 
 // Lesson 5: claimant journey
 const c5s1 = V(['maria', 'wa', 'sns', 'intake'], ['m-wa', 'wa-sns', 'sns-in'], [F('m-wa', 'req', 0.8, { text: ['photo 1 of 3', 'audio 0:42', 'me chocaron en la I-35'] }), F('wa-sns', 'msg', 0.8), F('sns-in', 'msg', 0.8)], {
@@ -415,11 +415,11 @@ export const ch15: Chapter = {
               zones: [onPrem], patch: { pas: { state: 'down', pin: { text: 'batch window', tone: 'red', icon: 'clock' } }, sfn: { pin: { text: 'retry 3/3, then park', tone: 'amber', icon: 'loop' } } } }) },
           body: ['The mainframe, claims app and ERP are not touched in phase 1. Small Lambda adapters reach them over a <b>Site-to-Site VPN</b>, and <b>AgentCore Gateway</b> exposes them as scoped MCP tools (get_policy, create_claim, create_payment_draft).',
             'Pricing sheets become versioned <b>DynamoDB</b> tables still owned by the pricing team.'] },
-        { short: 'Humans', tag: 'aws', title: 'Humans are part of the architecture', scene: c4s5, metrics: { layer: 'people', svc: 15 },
-          body: ['Adjusters work a review queue (an <b>Amazon A2I</b>-style human task, or a custom workbench) where AI drafts wait for decisions. Appraisers receive a claim pack by email or WhatsApp, and their photos and estimates flow back into S3.',
+        { short: 'Humans', tag: 'aws', title: 'Humans are part of the architecture', scene: c4s5, metrics: { layer: 'people', svc: 14 },
+          body: ['Adjusters work a review queue in a small workbench app where AI drafts wait for decisions; the workflow pauses on a Step Functions <b>task token</b> until they decide. Appraisers receive a claim pack by email or WhatsApp, and their photos and estimates flow back into S3.',
             '<b>EventBridge</b> carries claim events between stages and to notifications.'] },
-        { short: 'Whole', tag: 'recap', title: 'The whole picture', scene: c4s6, metrics: { layer: 'all', svc: 17 },
-          body: ['Seventeen managed services, zero new systems to run, no change to legacy in phase 1, and one agent inside the investigation step. Every arrow is traced into <b>CloudWatch</b>.'],
+        { short: 'Whole', tag: 'recap', title: 'The whole picture', scene: c4s6, metrics: { layer: 'all', svc: 16 },
+          body: ['Sixteen managed services plus one small workbench app, no change to legacy in phase 1, and one agent inside the investigation step. Every arrow is traced into <b>CloudWatch</b>.'],
           callout: { kind: 'aws', text: 'Region and service availability (End User Messaging Social, AgentCore, specific Bedrock models) should be confirmed per region before committing.' } },
       ],
       senior: dec({ context: 'The architecture must reach a mainframe, a 20-year-old claims app and an ERP, with no budget to modernise them this year.', decision: 'Wrap each legacy system with a thin adapter and expose it as scoped MCP tools through AgentCore Gateway; modernise later, behind the same tools.', consequences: ['AI can use legacy data in weeks', 'Legacy teams review only adapters', 'Future modernisation won\'t break the AI layer'], options: [{ name: 'Modernise legacy first', verdict: 'Years before value.' }, { name: 'MCP adapters in front of legacy', verdict: 'Value now; a seam for later modernisation.' }], cto: 'We put a clean interface in front of the old systems. The AI uses that interface today, and you can replace what\'s behind it on your own schedule.' }),
@@ -511,7 +511,7 @@ export const ch15: Chapter = {
         key: ['Assist pattern: AI prepares, compares and drafts; humans decide and release.', 'Pricing tables are the source of truth for estimate review.', 'Edits are the cheapest, highest-quality training signal you have.'],
         practices: ['Show reasons and evidence next to every flag.', 'Two-person approval above payment thresholds.', 'Review the top disagreements every week.'],
         pitfalls: ['Hiding AI suggestions as defaults that are easy to accept without review (automation bias).', 'Measuring adjuster speed only, not decision quality.'],
-        refs: [{ t: 'Amazon Augmented AI (A2I)', u: 'https://docs.aws.amazon.com/sagemaker/latest/dg/a2i-use-augmented-ai-a2i-human-review-loops.html' }],
+        refs: [{ t: 'AWS Step Functions: wait for a callback with task tokens', u: 'https://docs.aws.amazon.com/step-functions/latest/dg/connect-to-resource.html#connect-wait-token' }, { t: 'AWS service availability updates (SageMaker A2I in maintenance)', u: 'https://aws.amazon.com/about-aws/whats-new/2026/06/aws-service-availability/' }],
       },
     },
     {
