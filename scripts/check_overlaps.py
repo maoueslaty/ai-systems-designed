@@ -62,8 +62,9 @@ async def main():
                         if A['k'] not in LABELS and B['k'] not in LABELS: continue
                         if A['id'] == B['id'] and 'chip' not in (A['k'], B['k']): continue
                         if A['k'] == 'body' or B['k'] == 'body':
-                            lab = A if B['k'] == 'body' else B
-                            if lab['k'] not in ('tag', 'edge'): continue
+                            lab, body = (A, B) if B['k'] == 'body' else (B, A)
+                            if lab['k'] not in ('tag', 'edge', 'chip'): continue
+                            if lab['k'] == 'chip' and lab['id'] == f"pin-{body['id']}": continue
                         if A['k'] == 'face' and B['k'] == 'face': pass
                         if inter(A['r'], B['r']):
                             bad.append(f"{lid} step {i}: {A['k']}:{A['id']} x {B['k']}:{B['id']}")

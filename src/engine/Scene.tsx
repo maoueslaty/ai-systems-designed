@@ -74,9 +74,10 @@ function bodyRect(n: SNode): Rect {
   return [px + x0, py + y0, px + x1, py + y1];
 }
 
-interface Layout { nodes: Map<string, { x: number; y: number }>; edges: Map<string, number | null>; chips: Map<string, number> }
+interface Layout { nodes: Map<string, { x: number; y: number }>; edges: Map<string, number | null>; chips: Map<string, { dz: number; dx: number }> }
 
-function layoutLabels(nodes: SNode[], edges: { e: SEdge; p: [number, number][] }[], chips: SChip[], k: number): Layout {
+function layoutLabels(nodes: SNode[], edges: { e: SEdge; p: [number, number][] }[], chips: SChip[], k: number, frame?: Bounds): Layout {
+  const inFrame = (r: Rect) => !frame || (r[0] >= frame.x + 4 * k && r[2] <= frame.x + frame.w - 4 * k && r[1] >= frame.y + 4 * k && r[3] <= frame.y + frame.h - 4 * k);
   const bodies = new Map(nodes.map(n => [n.id, bodyRect(n)]));
   const placed: Rect[] = [];
   const out: Layout = { nodes: new Map(), edges: new Map(), chips: new Map() };
@@ -123,14 +124,29 @@ function layoutLabels(nodes: SNode[], edges: { e: SEdge; p: [number, number][] }
   }
   for (const c of chips) {
     const wt = textW(c.text, 12, 600) * k + ((c.icon ? 18 : 0) + 18) * k, ht = 26 * k;
-    let dz = 0;
-    for (let i = 0; i < 6; i++) {
+    const own = c.id.startsWith('pin-') ? c.id.slice(4) : undefined;
+    const step = (ht + 4 * k) / HZ, side = wt / 2 + 24 * k;
+    const cands: [number, number][] = [];
+    for (const a of [0, 1, 2, 3, 4]) for (const b of [0, 1, -1, 2, -2]) cands.push([a * step, b * side]);
+    cands.sort((p, q) => (Math.abs(p[0] / step) + Math.abs(p[1] / side) * 1.1) - (Math.abs(q[0] / step) + Math.abs(q[1] / side) * 1.1));
+    let pick: [number, number] | null = null;
+    for (const [dz, dx] of cands) {
       const [x, y] = proj(c.at[0], c.at[1], (c.z ?? 1.4) + dz);
-      const r: Rect = [x - wt / 2, y - ht / 2, x + wt / 2, y + ht / 2];
-      if (!placed.some(q => hit(r, q, -2 * k))) { placed.push(r); break; }
-      dz += (ht + 4 * k) / HZ;
+      const r: Rect = [x + dx - wt / 2, y - ht / 2, x + dx + wt / 2, y + ht / 2];
+      if (inFrame(r) && clearOf(r, own)) { pick = [dz, dx]; placed.push(r); break; }
     }
-    out.chips.set(c.id, dz);
+    if (!pick) {
+      // nothing fully clear: fall back to clearing labels only, rising as before
+      let dz = 0;
+      for (let i = 0; i < 6; i++) {
+        const [x, y] = proj(c.at[0], c.at[1], (c.z ?? 1.4) + dz);
+        const r: Rect = [x - wt / 2, y - ht / 2, x + wt / 2, y + ht / 2];
+        if (!placed.some(q => hit(r, q, -2 * k))) { placed.push(r); break; }
+        dz += step;
+      }
+      pick = [dz, 0];
+    }
+    out.chips.set(c.id, { dz: pick[0], dx: pick[1] });
   }
   return out;
 }
@@ -331,16 +347,19 @@ function ZoneView({ z }: { z: SZone }) {
   );
 }
 
-function ChipView({ c, dz = 0 }: { c: SChip; dz?: number }) {
+function ChipView({ c, pos }: { c: SChip; pos?: { dz: number; dx: number } }) {
   const k = useContext(K);
-  const [x, y] = proj(c.at[0], c.at[1], (c.z ?? 1.4) + dz);
+  const dz = pos?.dz ?? 0, dx = pos?.dx ?? 0;
+  const [x0, y] = proj(c.at[0], c.at[1], (c.z ?? 1.4) + dz);
+  const x = x0 + dx;
   const fs = 12;
   const iw = c.icon ? 18 : 0;
   const wt = textW(c.text, fs, 600) * k + (iw + 18) * k, ht = 26 * k;
   const tone = c.tone ?? 'green';
+  const lead = c.lead !== undefined ? [-dx, ((c.z ?? 1.4) + dz - c.lead) * HZ] : null;
   return (
     <g className="chip" data-chip={c.id} style={{ transform: `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px)` }}>
-      {c.lead !== undefined && <line className="pin-lead" x1={0} y1={ht / 2} x2={0} y2={Math.max(ht / 2, ((c.z ?? 1.4) + dz - c.lead) * HZ)} style={{ stroke: tv(tone, 'l') }} />}
+      {lead && (Math.abs(lead[0]) > 1 || lead[1] > ht / 2) && <line className="pin-lead" x1={dx === 0 ? 0 : Math.sign(-dx) * (wt / 2 - 6 * k)} y1={dx === 0 ? ht / 2 : 0} x2={lead[0]} y2={Math.max(lead[1], dx === 0 ? ht / 2 : 0)} style={{ stroke: tv(tone, 'l') }} />}
       <g className="chip-inner">
         <rect x={-wt / 2} y={-ht / 2} width={wt} height={ht} rx={6 * k} style={{ fill: tv(tone, 'z2'), stroke: tv(tone, 'l') }} />
         {c.icon && <GlyphPath g={c.icon} x={-wt / 2 + 15 * k} y={0} size={13 * k} color={tv(tone, 'l')} sw={2.3 * k} />}
@@ -523,7 +542,7 @@ function SceneSvg({ scene: raw, prev, bounds, paused, epoch }:
   useParticles(layer, paths, paused, epoch, k);
 
   const sorted = useMemo(() => scene.nodes.slice().sort((a, b) => (a.at[0] + a.at[1]) - (b.at[0] + b.at[1]) || (a.z ?? 0) - (b.z ?? 0)), [scene]);
-  const lay = useMemo(() => layoutLabels(sorted, edges, scene.chips ?? [], k), [sorted, edges, scene.chips, k]);
+  const lay = useMemo(() => layoutLabels(sorted, edges, scene.chips ?? [], k, framed), [sorted, edges, scene.chips, k, framed]);
 
   return (
     <K.Provider value={k}>
@@ -534,7 +553,7 @@ function SceneSvg({ scene: raw, prev, bounds, paused, epoch }:
         <g ref={layer} className="particles" />
         <g key={`n${epoch}`}>{sorted.map(n => <NodeView key={n.id} n={n} isNew={!prev.has(n.id)} lab={lay.nodes.get(n.id)} />)}</g>
         <g>{edges.map(({ e, p }) => <EdgeLabel key={e.id} e={e} p={p} t={lay.edges.get(e.id)} />)}</g>
-        <g key={`c${epoch}`}>{(scene.chips ?? []).map(c => <ChipView key={c.id} c={c} dz={lay.chips.get(c.id)} />)}</g>
+        <g key={`c${epoch}`}>{(scene.chips ?? []).map(c => <ChipView key={c.id} c={c} pos={lay.chips.get(c.id)} />)}</g>
       </svg>
     </K.Provider>
   );

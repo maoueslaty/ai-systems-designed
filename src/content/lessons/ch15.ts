@@ -592,3 +592,12 @@ export const ch15: Chapter = {
     },
   ],
 };
+
+// deep-dive lessons, slotted into the story where they belong
+import { DEEP } from './ch15_deep';
+{
+  const by = new Map(ch15.lessons.map(l => [l.id, l]));
+  ch15.lessons = ['claims-as-is', 'claims-discovery', 'claims-overdesign', 'claims-target-architecture']
+    .map(id => by.get(id)!)
+    .concat([DEEP.legacyIntegration, DEEP.accessByDesign, by.get('claims-fnol-journey')!, by.get('claims-adjuster-cockpit')!, DEEP.guardrailLayers, by.get('claims-governance')!, DEEP.costTracking, by.get('claims-rollout-economics')!]);
+}
