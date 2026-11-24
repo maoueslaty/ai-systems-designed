@@ -32,8 +32,12 @@ for (const ch of CHAPTERS) for (const l of ch.lessons) {
       if (d < 3.3 && arr[a].kind !== 'chip' && arr[b].kind !== 'chip') errors.push(`${where}: nodes ${arr[a].id} and ${arr[b].id} are ${d.toFixed(1)} apart`);
     }
   });
+  (l.quiz ?? []).forEach((q, i) => { if (q.answer < 0 || q.answer >= q.options.length) errors.push(`${l.id}: quiz ${i + 1} answer out of range`); });
+  if (l.scenario && !l.scenario.options.some(o => o.grade === 'best')) errors.push(`${l.id}: scenario has no best option`);
+  if (l.steps && !l.quiz?.length) errors.push(`${l.id}: animated lesson without quiz`);
   if (!l.notes.key.length || !l.notes.practices.length || !l.notes.pitfalls.length) errors.push(`${l.id}: incomplete notes`);
 }
+for (const ch of CHAPTERS) if (!ch.story) errors.push(`chapter ${ch.id}: no story entry`);
 for (const g of GLOSSARY) if (g.lesson && !ids.has(g.lesson)) errors.push(`glossary ${g.term}: unknown lesson ${g.lesson}`);
 const anim = ALL_LESSONS.filter(l => l.steps).length;
 console.log(`${CHAPTERS.length} chapters, ${ALL_LESSONS.length} lessons, ${anim} animated, ${ALL_LESSONS.reduce((s, l) => s + (l.steps?.length ?? 0), 0)} steps, ${GLOSSARY.length} terms`);

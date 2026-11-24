@@ -14,8 +14,20 @@ import { ch11 } from './lessons/ch11';
 import { ch12 } from './lessons/ch12';
 import { ch13 } from './lessons/ch13';
 import { ch14 } from './lessons/ch14';
+import { ch15 } from './lessons/ch15';
+import { STORY } from './story';
+import { EXTRAS } from './extras';
 
-export const CHAPTERS: Chapter[] = [ch00, ch01, ch02, ch03, ch04, ch05, ch06, ch07, ch08, ch09, ch10, ch11, ch12, ch13, ch14];
+const RAW: Chapter[] = [ch00, ch01, ch02, ch03, ch04, ch05, ch06, ch07, ch08, ch09, ch10, ch11, ch12, ch13, ch14, ch15];
+
+// merge the story layer and practice extras into the plain lesson data
+export const CHAPTERS: Chapter[] = RAW.map(c => ({
+  ...c,
+  story: c.story ?? STORY[c.id],
+  lessons: c.lessons.map(l => ({ ...l, ...(EXTRAS[l.id] ?? {}) })),
+}));
+
+export const hasPractice = (l: Lesson) => !!(l.quiz?.length || l.scenario || l.playground);
 
 export const ALL_LESSONS: Lesson[] = CHAPTERS.flatMap(c => c.lessons);
 

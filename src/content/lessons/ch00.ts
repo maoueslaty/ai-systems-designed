@@ -61,7 +61,7 @@ const s8: Scene = S([...fullNodes, OB], obsEdges, obsFlows, {
     C('c2', 8, -1.6, 'Ch 02 and 07: retrieval', { tone: 'violet', z: 1.9 }),
     C('c3', 12, -1.6, 'Ch 08–09: tools and MCP', { tone: 'teal', z: 2.1 }),
     C('c4', 8, 3.4, 'Ch 10: agents', { tone: 'cyan', z: 1.9 }),
-    C('c5', 12, 8.2, 'Ch 11–12: evals and ops', { tone: 'green', z: 1.7 }),
+    C('c5', 8, 10.4, 'Ch 11–12: evals and ops', { tone: 'green', z: 1 }),
     C('c6', 4, 8, 'Ch 13: security', { tone: 'red', z: 1.6 }),
   ],
 });

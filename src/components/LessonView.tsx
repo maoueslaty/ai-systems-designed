@@ -7,6 +7,9 @@ import { Widgets } from '../engine/Widgets';
 import { GLOSSARY } from '../content/glossary';
 import { go } from '../store';
 import { NotesView } from './NotesView';
+import { PracticeView, readQuiz } from './Practice';
+import { hasPractice } from '../content/curriculum';
+import { ACTS } from '../content/story';
 
 const LEGEND: Record<PKind, [string, string]> = {
   req: ['request', 'var(--t-blue-l)'], res: ['response', 'var(--t-green-l)'], token: ['token', 'var(--t-amber-t)'],
@@ -22,7 +25,13 @@ export function LessonView({ chapter, lesson, stepParam, next, onMark }:
   { chapter: Chapter; lesson: Lesson; stepParam?: string; next?: Lesson; onMark: (id: string, n: number) => void }) {
   const steps = lesson.steps ?? [];
   const animated = steps.length > 0;
-  const [mode, setMode] = useState<'anim' | 'notes'>(animated ? 'anim' : 'notes');
+  type Mode = 'anim' | 'notes' | 'practice';
+  const practice = hasPractice(lesson);
+  const initial = (): Mode => (stepParam === 'practice' && practice ? 'practice' : stepParam === 'notes' || !animated ? 'notes' : 'anim');
+  const [mode, setModeRaw] = useState<Mode>(initial);
+  const setMode = (m: Mode) => { setModeRaw(m); document.querySelector('.center')?.scrollTo?.({ top: 0 }); };
+  const [quizScore, setQuizScore] = useState(() => readQuiz()[lesson.id]);
+  const act = chapter.story ? ACTS[chapter.story.act] : undefined;
   const idx = Math.max(0, Math.min(steps.length - 1, (parseInt(stepParam ?? '1', 10) || 1) - 1));
   const step: Step | undefined = steps[idx];
   const [paused, setPaused] = useState(false);
@@ -33,7 +42,8 @@ export function LessonView({ chapter, lesson, stepParam, next, onMark }:
   const bounds = frames[idx] ?? { x: 0, y: 0, w: 100, h: 100 };
   const lessonNo = chapter.lessons.indexOf(lesson) + 1;
 
-  useEffect(() => { setMode(animated ? 'anim' : 'notes'); lastIdx.current = -1; prevIds.current = new Set(); }, [lesson.id, animated]);
+  useEffect(() => { setModeRaw(initial()); setQuizScore(readQuiz()[lesson.id]); lastIdx.current = -1; prevIds.current = new Set(); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lesson.id, animated]);
 
   // previous-step node ids → only truly new nodes pop in
   const prev = useMemo(() => {
@@ -79,14 +89,15 @@ export function LessonView({ chapter, lesson, stepParam, next, onMark }:
       <section className="center">
         <div className="lhead">
           <div>
-            <div className="crumb">Chapter {chapter.num}, lesson {lessonNo} of {chapter.lessons.length}<span className="meta"><Icon g="clock" size={13} />{lesson.minutes} min<Icon g="chart" size={13} />{lesson.level[0].toUpperCase() + lesson.level.slice(1)}{animated && <><Icon g="layers" size={13} />{steps.length} steps</>}</span></div>
+            <div className="crumb">{act && <a className="act" href={`#/chapter/${chapter.id}`}>{act.label}: {act.title}</a>}<span>Chapter {chapter.num}, lesson {lessonNo} of {chapter.lessons.length}</span><span className="meta"><Icon g="clock" size={13} />{lesson.minutes} min<Icon g="chart" size={13} />{lesson.level[0].toUpperCase() + lesson.level.slice(1)}{animated && <><Icon g="layers" size={13} />{steps.length} steps</>}</span></div>
             <h1 className="ltitle">{lesson.title}</h1>
             <p className="lsum">{lesson.summary}</p>
           </div>
-          {animated && (
+          {(animated || practice) && (
             <div className="tabs" role="tablist" aria-label="Lesson view">
-              <button role="tab" aria-selected={mode === 'anim'} className={mode === 'anim' ? 'on' : ''} onClick={() => setMode('anim')}>Animated</button>
+              {animated && <button role="tab" aria-selected={mode === 'anim'} className={mode === 'anim' ? 'on' : ''} onClick={() => setMode('anim')}>Animated</button>}
               <button role="tab" aria-selected={mode === 'notes'} className={mode === 'notes' ? 'on' : ''} onClick={() => setMode('notes')}>Field notes</button>
+              {practice && <button role="tab" aria-selected={mode === 'practice'} className={mode === 'practice' ? 'on' : ''} onClick={() => setMode('practice')}>Practice{quizScore ? ` ${quizScore.score}/${quizScore.total}` : ''}</button>}
             </div>
           )}
         </div>
@@ -130,8 +141,10 @@ export function LessonView({ chapter, lesson, stepParam, next, onMark }:
               </div>
             </div>
           </>
+        ) : mode === 'practice' ? (
+          <PracticeView lesson={lesson} onScore={(score, total) => setQuizScore({ score, total })} />
         ) : (
-          <NotesView lesson={lesson} animated={animated} next={next} />
+          <NotesView chapter={chapter} lesson={lesson} animated={animated} next={next} />
         )}
       </section>
 
@@ -166,7 +179,7 @@ export function LessonView({ chapter, lesson, stepParam, next, onMark }:
                 <button className="btn" disabled={idx === 0} onClick={() => goStep(idx - 1)}>Back</button>
                 {idx < steps.length - 1
                   ? <button className="btn primary" onClick={() => goStep(idx + 1)}>Next: {steps[idx + 1].short}</button>
-                  : <button className="btn primary" onClick={() => setMode('notes')}>Read the field notes</button>}
+                  : <button className="btn primary" onClick={() => setMode(practice ? 'practice' : 'notes')}>{practice ? 'Test yourself' : 'Read the field notes'}</button>}
               </div>
               <div className="keys"><span><kbd>←</kbd> <kbd>→</kbd> steps</span><span><kbd>R</kbd> replay</span><span><kbd>Space</kbd> pause</span></div>
             </div>
@@ -180,15 +193,31 @@ export function LessonView({ chapter, lesson, stepParam, next, onMark }:
                 ))}
               </div>
             )}
+            {chapter.story && (
+              <div className="card lens">
+                <h4><Icon g="chart" size={14} />Cost lens for this chapter</h4>
+                <p>{chapter.story.cost}</p>
+              </div>
+            )}
           </>
         ) : (
           <>
             <div className="card">
-              <div className="sc-top"><span>Field notes</span><span className="tag-pill tag-insight">{chapter.title}</span></div>
+              <div className="sc-top"><span>{mode === 'practice' ? 'Practice' : 'Field notes'}</span><span className="tag-pill tag-insight">{chapter.title}</span></div>
               <h2 className="sc-title">{lesson.title}</h2>
-              <p className="lsum">{lesson.summary}</p>
-              {animated && <button className="btn" style={{ marginTop: 12 }} onClick={() => setMode('anim')}>Back to the animation</button>}
+              <p className="lsum">{mode === 'practice' ? 'Try the numbers, make the call in a real situation, then check what stuck.' : lesson.summary}</p>
+              <div className="side-actions">
+                {animated && <button className="btn" onClick={() => setMode('anim')}>Back to the animation</button>}
+                {practice && mode !== 'practice' && <button className="btn" onClick={() => setMode('practice')}>Practice{quizScore ? ` (${quizScore.score}/${quizScore.total})` : ''}</button>}
+                {mode === 'practice' && <button className="btn" onClick={() => setMode('notes')}>Field notes</button>}
+              </div>
             </div>
+            {chapter.story && (
+              <div className="card lens">
+                <h4><Icon g="chart" size={14} />Cost lens for this chapter</h4>
+                <p>{chapter.story.cost}</p>
+              </div>
+            )}
             {lesson.goals && (
               <div className="card goals">
                 <h4>Lesson goals</h4>

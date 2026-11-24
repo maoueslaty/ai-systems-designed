@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CHAPTERS, ALL_LESSONS, findLesson } from './content/curriculum';
+import { CHAPTERS, ALL_LESSONS, findLesson, hasPractice } from './content/curriculum';
+import { ACTS, THREAD } from './content/story';
+import type { Chapter } from './content/types';
 import { GLOSSARY } from './content/glossary';
 import { HERO } from './content/hero';
 import { Icon } from './engine/glyphs';
@@ -34,10 +36,13 @@ function Sidebar({ current, progress, open }: { current?: string; progress: Reco
     <nav className={`sidebar ${open ? 'mob' : ''}`}>
       <div className="tree">
         <div className="tree-h"><span>Course</span><span>{total} lessons</span></div>
-        {CHAPTERS.map(ch => {
+        {CHAPTERS.map((ch, ci) => {
           const isOpen = expanded.has(ch.id);
+          const act = ch.story?.act;
+          const newAct = act !== undefined && act !== CHAPTERS[ci - 1]?.story?.act;
           return (
             <div key={ch.id} className={`ch ${isOpen ? 'open' : ''}`}>
+              {newAct && <div className="act-h"><span>{ACTS[act].label}</span>{ACTS[act].title}</div>}
               <button className="ch-btn" onClick={() => setExpanded(s => { const n = new Set(s); if (n.has(ch.id)) n.delete(ch.id); else n.add(ch.id); return n; })}>
                 <span className="car" aria-hidden="true">▸</span>
                 <span className="dot" style={{ background: `var(--t-${ch.tone}-l)` }} />
@@ -107,52 +112,86 @@ function Search({ onClose }: { onClose: () => void }) {
   );
 }
 
+const CASE = CHAPTERS.find(c => c.id === 'case-study')!;
+const CASE_SCENE = CASE.lessons.find(l => l.id === 'claims-target-architecture')!.steps!.at(-1)!.scene;
+
+function ChapterRow({ ch }: { ch: Chapter }) {
+  return (
+    <a className="chrow" href={`#/chapter/${ch.id}`} style={{ ['--c' as string]: `var(--t-${ch.tone}-l)` }}>
+      <span className="n">{ch.num}</span>
+      <h3>{ch.title}</h3>
+      <span className="meta">{ch.lessons.length} lessons</span>
+      <p>{ch.blurb}</p>
+    </a>
+  );
+}
+
 function Home() {
   const bounds = useMemo(() => sceneBounds([HERO]), []);
+  const caseBounds = useMemo(() => sceneBounds([CASE_SCENE]), []);
   const animatedCount = ALL_LESSONS.filter(l => l.steps).length;
-  const tok = findLesson('tokenization-bpe')!.lesson;
+  const practiceCount = ALL_LESSONS.filter(hasPractice).length;
   return (
     <div className="home">
       <section className="hero">
         <div>
           <h1>How AI systems actually work, drawn one step at a time.</h1>
-          <p>Animated lessons on the whole stack: tokens, embeddings and attention, then inference, RAG, tool use, MCP, agents, evals and LLMOps, ending with reference architectures on AWS.</p>
-          <p>Each lesson closes with field notes: the best practices, edge cases and gotchas that matter when you deploy this for a real customer.</p>
+          <p>A field guide in four acts: how the machine works (tokens, embeddings, attention, inference), how to build a system around it (RAG, tools, MCP, agents), how to run it for real (evals, LLMOps, security, AWS), and one insurance claim that ties it all together.</p>
+          <p>Every chapter answers the same question a CFO would ask: what does this do to the cost, speed and quality of one unit of real work?</p>
           <div className="cta">
             <a className="btn primary" href={`#/learn/${CHAPTERS[0].lessons[0].id}`}>Start with the system map</a>
-            <a className="btn" href={`#/learn/${tok.id}`}>Begin at tokenization</a>
+            <a className="btn" href="#/chapter/case-study">Read the claims case study</a>
           </div>
-          <div className="count">{CHAPTERS.length} chapters, {ALL_LESSONS.length} lessons, {animatedCount} of them animated.</div>
+          <div className="count">{CHAPTERS.length} chapters, {ALL_LESSONS.length} lessons, {animatedCount} animated, {practiceCount} with practice.</div>
         </div>
         <div className="hero-stage">
           <SceneView scene={HERO} prev={new Set(HERO.nodes.map(n => n.id))} bounds={bounds} paused={false} epoch={0} dock="none" />
-          <span className="hero-caption">Lesson 00: a production AI system, layer by layer</span>
+          <span className="hero-caption">Prologue: a production AI system, layer by layer</span>
         </div>
       </section>
 
-      <section className="sec">
-        <h2>Chapters</h2>
-        <p>Read in order or jump to what you need. Every chapter has at least one animated lesson; the others are written field notes.</p>
-        <div className="chlist">
-          {CHAPTERS.map(ch => (
-            <a key={ch.id} className="chrow" href={`#/learn/${(ch.lessons.find(l => l.steps) ?? ch.lessons[0]).id}`} style={{ ['--c' as string]: `var(--t-${ch.tone}-l)` }}>
-              <span className="n">{ch.num}</span>
-              <h3>{ch.title}</h3>
-              <span className="meta">{ch.lessons.length} lessons</span>
-              <p>{ch.blurb}</p>
-            </a>
-          ))}
+      <section className="sec thread">
+        <h2>The thread: {THREAD.name.toLowerCase()}</h2>
+        <p>{THREAD.intro}</p>
+      </section>
+
+      {ACTS.map(act => {
+        const chs = CHAPTERS.filter(c => c.story?.act === act.n);
+        if (act.n === 4) return null;
+        return (
+          <section key={act.n} className="sec act">
+            <div className="act-head"><span className="act-l">{act.label}</span><h2>{act.title}</h2></div>
+            <p>{act.thesis}</p>
+            <div className="chlist">{chs.map(ch => <ChapterRow key={ch.id} ch={ch} />)}</div>
+          </section>
+        );
+      })}
+
+      <section className="sec epilogue">
+        <div className="act-head"><span className="act-l">{ACTS[4].label}</span><h2>{ACTS[4].title}</h2></div>
+        <p>{ACTS[4].thesis}</p>
+        <div className="epi">
+          <div className="epi-stage">
+            <SceneView scene={CASE_SCENE} prev={new Set(CASE_SCENE.nodes.map(n => n.id))} bounds={caseBounds} paused={false} epoch={0} dock="none" />
+            <span className="hero-caption">The target architecture for Northline Mutual, a fictional US auto insurer</span>
+          </div>
+          <ol className="epi-list">
+            {CASE.lessons.map(l => (
+              <li key={l.id}><a href={`#/learn/${l.id}`}><b>{l.title}</b><span>{l.summary}</span></a></li>
+            ))}
+          </ol>
         </div>
       </section>
 
       <section className="sec">
         <h2>How a lesson works</h2>
-        <p>The same loop every time: see the system, break it, fix it, then write down what you learned.</p>
+        <p>The same loop every time: see the system, break it, fix it, decide like a senior engineer, then check what stuck.</p>
         <div className="pillars">
           {[
             ['eye', 'Watch it move', 'Requests, tokens, vectors and tool calls flow through an isometric drawing of the system, one step at a time.'],
             ['x', 'Break it on purpose', 'Each lesson walks into the classic failure (context overflow, injection, a hallucinated tool argument) before fixing it.'],
-            ['check', 'Keep the notes', 'Best practices, edge cases and field notes are written down so the knowledge sticks and can be shared.'],
+            ['scale', 'Decide like a lead', 'Field notes open with a decision record: the options, the call, its consequences and what to tell the CTO.'],
+            ['check', 'Practice', 'Quizzes, field scenarios with graded outcomes, and calculators for cost, KV memory, context budgets and reliability.'],
             ['box', 'Real architectures', 'Cloud diagrams use the official AWS Architecture Icons and are checked against current AWS documentation.'],
           ].map(([g, t, d]) => (
             <div key={t} className="pillar"><div className="pi"><Icon g={g as 'eye'} size={20} /></div><h4>{t}</h4><p>{d}</p></div>
@@ -160,6 +199,46 @@ function Home() {
         </div>
       </section>
       <Footer />
+    </div>
+  );
+}
+
+function ChapterPage({ ch }: { ch: Chapter }) {
+  const act = ch.story ? ACTS[ch.story.act] : undefined;
+  const i = CHAPTERS.indexOf(ch);
+  const prev = CHAPTERS[i - 1], next = CHAPTERS[i + 1];
+  const first = ch.lessons.find(l => l.steps) ?? ch.lessons[0];
+  return (
+    <div className="page chapter-page" style={{ ['--c' as string]: `var(--t-${ch.tone}-l)` }}>
+      {act && <div className="crumb"><span>{act.label}: {act.title}</span><span>Chapter {ch.num}</span></div>}
+      <h1>{ch.title}</h1>
+      <p className="lead">{ch.blurb}</p>
+      {ch.story && (
+        <div className="story3">
+          <div><h4><Icon g="spark" size={15} />Why it matters</h4><p>{ch.story.why}</p></div>
+          <div><h4><Icon g="chart" size={15} />Cost lens</h4><p>{ch.story.cost}</p></div>
+          <div><h4><Icon g="route" size={15} />Carry forward</h4><p>{ch.story.carry}</p></div>
+        </div>
+      )}
+      <p style={{ margin: '22px 0 0' }}><a className="btn primary" href={`#/learn/${first.id}`}>Start: {first.title}</a></p>
+      <h2 className="sub">Lessons</h2>
+      <div className="lesson-list">
+        {ch.lessons.map((l, k) => (
+          <a key={l.id} href={`#/learn/${l.id}`} className="lrow">
+            <span className="n">{k + 1}</span>
+            <span className="t"><b>{l.title}</b><span>{l.summary}</span></span>
+            <span className="tags">
+              {l.steps ? <span><Icon g="spark" size={12} />{l.steps.length} animated steps</span> : <span><Icon g="doc" size={12} />Notes</span>}
+              {hasPractice(l) && <span><Icon g="check" size={12} />Practice</span>}
+              <span><Icon g="clock" size={12} />{l.minutes} min</span>
+            </span>
+          </a>
+        ))}
+      </div>
+      <div className="pager">
+        {prev ? <a className="btn" href={`#/chapter/${prev.id}`}>Previous: {prev.title}</a> : <span />}
+        {next && <a className="btn" href={`#/chapter/${next.id}`}>Next: {next.title}</a>}
+      </div>
     </div>
   );
 }
@@ -233,6 +312,7 @@ export default function App() {
   const { progress, mark } = useProgress();
   const [search, setSearch] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [side, setSide] = useState(() => typeof window === 'undefined' || window.innerWidth >= 1360);
   const onMark = useCallback((id: string, n: number) => mark(id, n), [mark]);
 
   useEffect(() => {
@@ -245,26 +325,29 @@ export default function App() {
   const [page, a, b] = route;
   const found = page === 'learn' && a ? findLesson(a) : undefined;
   useEffect(() => {
-    document.title = found ? `${found.lesson.title} | AI Systems, Designed` : 'AI Systems, Designed: an animated field guide';
+    const ch = page === 'chapter' ? CHAPTERS.find(c => c.id === a) : undefined;
+    document.title = found ? `${found.lesson.title} | AI Systems, Designed` : ch ? `${ch.title} | AI Systems, Designed` : 'AI Systems, Designed: an animated field guide';
     if (page === 'learn' && !found) go('');
-  }, [found, page]);
+  }, [found, page, a]);
 
   let content: React.ReactNode;
   let right = true;
   if (found) {
     const flat = ALL_LESSONS; const i = flat.indexOf(found.lesson);
     content = <LessonView key={found.lesson.id} chapter={found.chapter} lesson={found.lesson} stepParam={b} next={flat[i + 1]} onMark={onMark} />;
-  } else if (page === 'glossary') { content = <Glossary />; right = false; }
+  } else if (page === 'chapter' && CHAPTERS.some(c => c.id === a)) { content = <ChapterPage key={a} ch={CHAPTERS.find(c => c.id === a)!} />; right = false; }
+  else if (page === 'glossary') { content = <Glossary />; right = false; }
   else if (page === 'about') { content = <About />; right = false; }
   else { content = <Home />; right = false; }
 
   return (
     <div className="app">
       <header className="topbar">
-        <button className="iconbtn menu-btn" onClick={() => setMenu(m => !m)} aria-label="Menu"><Icon g="layers" size={16} /></button>
+        <button className="iconbtn menu-btn" onClick={() => setMenu(m => !m)} aria-label="Open course menu"><Icon g="layers" size={16} /></button>
+        <button className="iconbtn side-btn" onClick={() => setSide(v => !v)} aria-label={side ? 'Hide course outline' : 'Show course outline'} aria-pressed={!side} title={side ? 'Hide course outline' : 'Show course outline'}><Icon g="layers" size={16} /></button>
         <a className="brand" href="#/"><Logo /><span>AI Systems, Designed</span></a>
         <nav className="nav">
-          <a href="#/learn/ai-system-map" className={page === 'learn' ? 'on' : ''}><Icon g="layers" size={15} /><span>Learn</span></a>
+          <a href="#/learn/ai-system-map" className={page === 'learn' || page === 'chapter' ? 'on' : ''}><Icon g="layers" size={15} /><span>Learn</span></a>
           <a href="#/glossary" className={page === 'glossary' ? 'on' : ''}><Icon g="hash" size={15} /><span>Glossary</span></a>
           <a href="#/about" className={page === 'about' ? 'on' : ''}><Icon g="user" size={15} /><span>About</span></a>
         </nav>
@@ -273,7 +356,7 @@ export default function App() {
         <button className="iconbtn" onClick={toggle} title="Toggle theme" aria-label="Toggle theme"><Icon g={theme === 'dark' ? 'sun' : 'moon'} size={17} /></button>
         <a className="author" href="#/about">by {AUTHOR.name}</a>
       </header>
-      <div className={`main ${right ? '' : 'no-right'}`}>
+      <div className={`main ${right ? '' : 'no-right'} ${side ? '' : 'side-closed'}`}>
         <Sidebar current={found?.lesson.id} progress={progress} open={menu} />
         {content}
       </div>

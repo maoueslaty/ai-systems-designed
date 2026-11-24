@@ -132,7 +132,27 @@ export interface Notes {
   refs?: { t: string; u: string }[];
 }
 
-export interface Lesson {
+export interface DecisionRecord {
+  context: string;
+  options: { name: string; verdict: string }[];
+  decision: string;
+  consequences: string[];
+  cto: string;                // what I'd tell the CTO, in one or two sentences
+}
+
+export interface QuizQ { q: string; options: string[]; answer: number; why: string }
+
+export interface Scenario {
+  title: string;
+  situation: string;
+  options: { text: string; outcome: string; grade: 'best' | 'ok' | 'poor' }[];
+}
+
+export type PlaygroundId = 'cost' | 'token-tax' | 'sampling' | 'kv' | 'reliability' | 'budget' | 'claims-cost';
+
+export interface LessonExtras { senior?: DecisionRecord; quiz?: QuizQ[]; scenario?: Scenario; playground?: PlaygroundId }
+
+export interface Lesson extends LessonExtras {
   id: string;
   title: string;
   summary: string;
@@ -145,6 +165,13 @@ export interface Lesson {
   notes: Notes;
 }
 
+export interface ChapterStory {
+  act: 0 | 1 | 2 | 3 | 4;     // 0 prologue, 4 epilogue (case study)
+  why: string;                 // why this chapter matters, in plain words
+  cost: string;                // the unit-economics lens: how it moves cost, latency or quality
+  carry: string;               // what to carry into the next chapter
+}
+
 export interface Chapter {
   id: string;
   num: string;
@@ -152,4 +179,5 @@ export interface Chapter {
   tone: Tone;
   blurb: string;
   lessons: Lesson[];
+  story?: ChapterStory;
 }

@@ -30,7 +30,7 @@ const s5: Scene = S([...nodes, KV].map(n => (n.id === 'sch' ? { ...n, label: 'co
   [F('r-s', 'req', 3), F('s-g', 'req', 3), F('h-g', 'msg', 1.2), F('g-kv', 'vec', 1.2), F('g-o', 'token', 3.5, { text: ['A', 'B', 'done', 'C', 'new', 'D'] })], {
     widgets: [{ type: 'kv', id: 'cb', x: 0, y: 0, w: 320, title: 'iteration-level scheduling', rows: [['after every decode step', 'finished seqs leave'], ['', 'waiting seqs join'], ['result', 'GPU slots stay full', 'green'], ['origin', 'Orca (OSDI 2022)']] }],
   });
-const BLOCKS = [0, 1, 2, 3].map(i => N(`b${i}`, 15.2 + (i % 2) * 1.5, -2.8 + Math.floor(i / 2) * 1.3, { kind: 'chip', label: `block ${i}`, tone: i === 3 ? 'slate' : 'pink', w: 1.1, d: 0.9, h: 0.2 }));
+const BLOCKS = [0, 1, 2, 3].map(i => N(`b${i}`, 15.2 + (i % 2) * 1.5, -2.8 + Math.floor(i / 2) * 1.3, { kind: 'chip', label: `B${i}`, tone: i === 3 ? 'slate' : 'pink', w: 1.1, d: 0.9, h: 0.2 }));
 const s6: Scene = S([...nodes, KV, ...BLOCKS], [...E0, E('g-kv', 'gpu', 'kv', { both: true, label: 'block table' })],
   [F('r-s', 'req', 3), F('s-g', 'req', 3), F('h-g', 'msg', 1.2), F('g-kv', 'vec', 1.5), F('g-o', 'token', 3.5, { text: ['A', 'B', 'C'] })], {
     widgets: [{ type: 'stack', id: 'frag', x: 0, y: 0, w: 320, title: 'before: contiguous pre-allocation', items: [{ label: 'seq A used', size: 3, tone: 'pink' }, { label: 'reserved, unused', size: 5, tone: 'red', hi: true }, { label: 'seq B', size: 2, tone: 'pink' }], cap: 10, capLabel: 'fragmentation wastes KV memory' },

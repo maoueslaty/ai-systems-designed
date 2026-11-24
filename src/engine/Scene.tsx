@@ -40,6 +40,101 @@ function Tag({ x, y, text, sub, k }: { x: number; y: number; text: string; sub?:
   );
 }
 
+
+// ───────────── label layout: keep every label clear of other nodes and labels ─────────────
+type Rect = [number, number, number, number]; // x0 y0 x1 y1 (user units, absolute)
+const hit = (a: Rect, b: Rect, pad = 0) => a[0] < b[2] - pad && b[0] < a[2] - pad && a[1] < b[3] - pad && b[1] < a[3] - pad;
+
+function labelInfo(n: SNode, k: number) {
+  const kind = n.kind ?? 'cube';
+  const { w, d } = nodeSize(n);
+  const lines = n.label === undefined ? [] : Array.isArray(n.label) ? n.label : [n.label];
+  const text = lines.join(' ');
+  const foot = (w / 2 + d / 2) * 14;
+  let onTop = kind === 'slab' || kind === 'chip';
+  let labelY = kind === 'cyl' ? (Math.min(w, d) / 2) * HZ * 0.66 + 8 : foot + 8;
+  const faceFs = Math.min(FONT_PX * k, 13);
+  if (onTop && text && textW(text, faceFs / k, 700) * k > (w + d) * 28 * 0.62) { onTop = false; labelY = foot + 6; }
+  const tw = Math.max(textW(text, FONT_PX), n.sub ? textW(n.sub, 10.5, 500) : 0) * k + 14 * k;
+  const th = (n.sub ? 34 : 21) * k;
+  return { text, onTop, labelY, tw, th, faceFs };
+}
+
+function bodyRect(n: SNode): Rect {
+  const kind = n.kind ?? 'cube';
+  const { w, d, h } = nodeSize(n);
+  const [px, py] = proj(n.at[0], n.at[1], n.z ?? 0);
+  const s = (w / 2 + d / 2);
+  let x0 = -s * 28, x1 = s * 28, y0 = -s * 14 - h * HZ, y1 = s * 14;
+  if (kind === 'aws') { y0 = Math.min(y0, -h * HZ - 46 - 8); x0 = Math.min(x0, -24); x1 = Math.max(x1, 24); }
+  if (kind === 'cyl') { const rx = (Math.min(w, d) / 2) * HZ * 1.32; x0 = -rx; x1 = rx; y0 = -h * HZ - rx / 2; y1 = rx / 2; }
+  if (kind === 'crowd') y0 = -s * 14 - 36;
+  if (kind === 'doc') y0 = -s * 14 - 0.5 * HZ;
+  if (kind === 'gpu') y0 = -s * 14 - (h + 0.2) * HZ;
+  return [px + x0, py + y0, px + x1, py + y1];
+}
+
+interface Layout { nodes: Map<string, { x: number; y: number }>; edges: Map<string, number | null>; chips: Map<string, number> }
+
+function layoutLabels(nodes: SNode[], edges: { e: SEdge; p: [number, number][] }[], chips: SChip[], k: number): Layout {
+  const bodies = new Map(nodes.map(n => [n.id, bodyRect(n)]));
+  const placed: Rect[] = [];
+  const out: Layout = { nodes: new Map(), edges: new Map(), chips: new Map() };
+  const clearOf = (r: Rect, own?: string) => {
+    for (const [id, b] of bodies) if (id !== own && hit(r, b, -3 * k)) return false;
+    for (const q of placed) if (hit(r, q, -2 * k)) return false;
+    return true;
+  };
+  for (const n of nodes) {
+    const L = labelInfo(n, k);
+    if (!L.text || L.onTop) continue;
+    const [px, py] = proj(n.at[0], n.at[1], n.z ?? 0);
+    const b = bodies.get(n.id)!;
+    const cands: { x: number; y: number }[] = [
+      { x: 0, y: L.labelY },
+      { x: 0, y: b[1] - py - L.th - 4 * k },
+      { x: b[2] - px + 6 * k + L.tw / 2, y: (b[1] + b[3]) / 2 - py - L.th / 2 },
+      { x: b[0] - px - 6 * k - L.tw / 2, y: (b[1] + b[3]) / 2 - py - L.th / 2 },
+      { x: L.tw * 0.45, y: L.labelY + L.th + 2 * k },
+      { x: -L.tw * 0.45, y: L.labelY + L.th + 2 * k },
+    ];
+    let pick = cands[0];
+    for (const c of cands) {
+      const r: Rect = [px + c.x - L.tw / 2, py + c.y, px + c.x + L.tw / 2, py + c.y + L.th];
+      if (clearOf(r, n.id)) { pick = c; break; }
+    }
+    out.nodes.set(n.id, pick);
+    placed.push([px + pick.x - L.tw / 2, py + pick.y, px + pick.x + L.tw / 2, py + pick.y + L.th]);
+  }
+  for (const { e, p } of edges) {
+    if (!e.label) continue;
+    const w = textW(e.label, 11.5, 500) * k + 14 * k, h = 20 * k;
+    const L = polyLength(p);
+    let chosen: number | null = null;
+    if (L >= w + 40 * k) {
+      const base = e.labelAt ?? 0.5;
+      for (const t of [base, 0.5, 0.38, 0.62, 0.28, 0.72]) {
+        const m = pointAt(p, L * t);
+        const r: Rect = [m[0] - w / 2, m[1] - h / 2, m[0] + w / 2, m[1] + h / 2];
+        if (clearOf(r)) { chosen = t; placed.push(r); break; }
+      }
+    }
+    out.edges.set(e.id, chosen);
+  }
+  for (const c of chips) {
+    const wt = textW(c.text, 12, 600) * k + ((c.icon ? 18 : 0) + 18) * k, ht = 26 * k;
+    let dz = 0;
+    for (let i = 0; i < 6; i++) {
+      const [x, y] = proj(c.at[0], c.at[1], (c.z ?? 1.4) + dz);
+      const r: Rect = [x - wt / 2, y - ht / 2, x + wt / 2, y + ht / 2];
+      if (!placed.some(q => hit(r, q, -2 * k))) { placed.push(r); break; }
+      dz += (ht + 4 * k) / HZ;
+    }
+    out.chips.set(c.id, dz);
+  }
+  return out;
+}
+
 // ───────────────────────── shapes ─────────────────────────
 function Box({ w, d, h, tone, z0 = 0 }: { w: number; d: number; h: number; tone: string; z0?: number }) {
   const hw = w / 2, hd = d / 2;
@@ -87,23 +182,20 @@ function People({ w, d }: { w: number; d: number }) {
   return <g>{out}</g>;
 }
 
-function NodeView({ n, isNew }: { n: SNode; isNew: boolean }) {
+function NodeView({ n, isNew, lab }: { n: SNode; isNew: boolean; lab?: { x: number; y: number } }) {
   const k = useContext(K);
   const kind = n.kind ?? 'cube';
   const { w, d, h } = nodeSize(n);
   const tone = n.state === 'down' ? 'slate' : (n.tone ?? (kind === 'aws' ? 'slate' : 'cyan'));
   const [px, py] = proj(n.at[0], n.at[1], n.z ?? 0);
-  const lines = n.label === undefined ? [] : Array.isArray(n.label) ? n.label : [n.label];
   const foot = (w / 2 + d / 2) * 14;
-  const text = lines.join(' ');
+  const L = labelInfo(n, k);
+  const text = L.text, onTop = L.onTop, faceFs = L.faceFs;
   let body: React.ReactNode;
-  let labelY = foot + 8;
-  let onTop = false;
 
   switch (kind) {
     case 'cyl':
       body = <><Cyl r={Math.min(w, d) / 2} h={h} tone={tone} />{n.glyph && <GlyphPath g={n.glyph} x={0} y={-h * HZ} size={17} color="var(--node-ink)" sw={2} />}</>;
-      labelY = (Math.min(w, d) / 2) * HZ * 0.66 + 8;
       break;
     case 'aws': {
       const inner = awsInner(n.aws ?? '');
@@ -140,25 +232,19 @@ function NodeView({ n, isNew }: { n: SNode; isNew: boolean }) {
     }
     case 'slab': case 'chip':
       body = <Box w={w} d={d} h={h} tone={tone} />;
-      onTop = true;
       break;
     default:
       body = <><Box w={w} d={d} h={h} tone={tone} />{n.glyph && <GlyphPath g={n.glyph} x={0} y={-h * HZ} size={19} color="var(--node-ink)" sw={2.1} />}</>;
   }
 
-  const faceFs = Math.min(FONT_PX * k, 13);
-  if (onTop && text) {
-    const usable = (w + d) * 28 * 0.62;           // inner width of the top face (user units)
-    if (textW(text, faceFs / k, 700) * k > usable) { onTop = false; labelY = foot + 6; }
-  }
   const cls = ['node', `k-${kind}`, n.state ? `s-${n.state}` : '', isNew ? 'is-new' : ''].join(' ');
   return (
-    <g className={cls} style={{ transform: `translate(${px.toFixed(2)}px, ${py.toFixed(2)}px)`, ['--node-ink' as string]: tv(tone, 'i') }}>
+    <g className={cls} data-node={n.id} style={{ transform: `translate(${px.toFixed(2)}px, ${py.toFixed(2)}px)`, ['--node-ink' as string]: tv(tone, 'i') }}>
       <g className="node-inner">
         {n.state === 'hot' && <ellipse cx={0} cy={0} rx={(w + d) * 19} ry={(w + d) * 9.5} className="hot-ring" />}
         {body}
         {onTop && text && <text className="face-label" x={0} y={-h * HZ + faceFs * 0.36} textAnchor="middle" style={{ fontSize: faceFs }}>{text}</text>}
-        {!onTop && text && <Tag x={0} y={labelY} text={text} sub={n.sub} k={k} />}
+        {!onTop && text && <Tag x={lab?.x ?? 0} y={lab?.y ?? L.labelY} text={text} sub={n.sub} k={k} />}
         {onTop && n.sub && <Tag x={0} y={foot + 6} text={n.sub} k={k} />}
         {!onTop && (kind === 'slab' || kind === 'chip') && !text && null}
         {n.state === 'down' && <g className="down-x" transform={`translate(0 ${-h * HZ - 10})`}><circle r={11} /><GlyphPath g="x" x={0} y={0} size={13} color="#fff" sw={2.6} /></g>}
@@ -217,15 +303,14 @@ function EdgeView({ e, p }: { e: SEdge; p: [number, number][] }) {
   );
 }
 
-function EdgeLabel({ e, p }: { e: SEdge; p: [number, number][] }) {
+function EdgeLabel({ e, p, t }: { e: SEdge; p: [number, number][]; t: number | null | undefined }) {
   const k = useContext(K);
-  if (!e.label) return null;
+  if (!e.label || t === null || t === undefined) return null;
   const fs = 11.5;
   const w = textW(e.label, fs, 500) * k + 14 * k, h = 20 * k;
-  if (polyLength(p) < w + 64 * k) return null;     // too short to label without clutter
-  const mid = pointAt(p, polyLength(p) * (e.labelAt ?? 0.5));
+  const mid = pointAt(p, polyLength(p) * t);
   return (
-    <g transform={`translate(${mid[0].toFixed(2)} ${mid[1].toFixed(2)})`} className="elabel">
+    <g transform={`translate(${mid[0].toFixed(2)} ${mid[1].toFixed(2)})`} className="elabel" data-edge={e.id}>
       <rect x={-w / 2} y={-h / 2} width={w} height={h} rx={h / 2} />
       <text x={0} y={4 * k} textAnchor="middle" style={{ fontSize: fs * k }}>{e.label}</text>
     </g>
@@ -246,15 +331,15 @@ function ZoneView({ z }: { z: SZone }) {
   );
 }
 
-function ChipView({ c }: { c: SChip }) {
+function ChipView({ c, dz = 0 }: { c: SChip; dz?: number }) {
   const k = useContext(K);
-  const [x, y] = proj(c.at[0], c.at[1], c.z ?? 1.4);
+  const [x, y] = proj(c.at[0], c.at[1], (c.z ?? 1.4) + dz);
   const fs = 12;
   const iw = c.icon ? 18 : 0;
   const wt = textW(c.text, fs, 600) * k + (iw + 18) * k, ht = 26 * k;
   const tone = c.tone ?? 'green';
   return (
-    <g className="chip" style={{ transform: `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px)` }}>
+    <g className="chip" data-chip={c.id} style={{ transform: `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px)` }}>
       <g className="chip-inner">
         <rect x={-wt / 2} y={-ht / 2} width={wt} height={ht} rx={6 * k} style={{ fill: tv(tone, 'z2'), stroke: tv(tone, 'l') }} />
         {c.icon && <GlyphPath g={c.icon} x={-wt / 2 + 15 * k} y={0} size={13 * k} color={tv(tone, 'l')} sw={2.3 * k} />}
@@ -412,7 +497,9 @@ function SceneSvg({ scene, prev, bounds, paused, epoch }:
   { scene: Scene; prev: Set<string>; bounds: Bounds; paused: boolean; epoch: number }) {
   const svgRef = useRef<SVGSVGElement>(null);
   useCamera(svgRef, bounds);
-  const k = useScale(svgRef, bounds);
+  const kRaw = useScale(svgRef, bounds);
+  // labels keep a constant size when there is room; on cramped stages they shrink partway with the drawing
+  const k = kRaw > 1 ? Math.round((1 + (kRaw - 1) * 0.55) * 100) / 100 : kRaw;
   const byId = useMemo(() => new Map(scene.nodes.map(n => [n.id, n])), [scene]);
   const edges = useMemo(() => (scene.edges ?? []).map(e => ({ e, p: edgeScreen(e, byId) })).filter(x => x.p) as { e: SEdge; p: [number, number][] }[], [scene, byId]);
   const paths = useMemo(() => {
@@ -428,6 +515,7 @@ function SceneSvg({ scene, prev, bounds, paused, epoch }:
   useParticles(layer, paths, paused, epoch, k);
 
   const sorted = useMemo(() => scene.nodes.slice().sort((a, b) => (a.at[0] + a.at[1]) - (b.at[0] + b.at[1]) || (a.z ?? 0) - (b.z ?? 0)), [scene]);
+  const lay = useMemo(() => layoutLabels(sorted, edges, scene.chips ?? [], k), [sorted, edges, scene.chips, k]);
 
   return (
     <K.Provider value={k}>
@@ -436,9 +524,9 @@ function SceneSvg({ scene, prev, bounds, paused, epoch }:
         <g key={`z${epoch}`}>{(scene.zones ?? []).map(z => <ZoneView key={z.id} z={z} />)}</g>
         <g>{edges.map(({ e, p }) => <EdgeView key={e.id} e={e} p={p} />)}</g>
         <g ref={layer} className="particles" />
-        <g key={`n${epoch}`}>{sorted.map(n => <NodeView key={n.id} n={n} isNew={!prev.has(n.id)} />)}</g>
-        <g>{edges.map(({ e, p }) => <EdgeLabel key={e.id} e={e} p={p} />)}</g>
-        <g key={`c${epoch}`}>{(scene.chips ?? []).map(c => <ChipView key={c.id} c={c} />)}</g>
+        <g key={`n${epoch}`}>{sorted.map(n => <NodeView key={n.id} n={n} isNew={!prev.has(n.id)} lab={lay.nodes.get(n.id)} />)}</g>
+        <g>{edges.map(({ e, p }) => <EdgeLabel key={e.id} e={e} p={p} t={lay.edges.get(e.id)} />)}</g>
+        <g key={`c${epoch}`}>{(scene.chips ?? []).map(c => <ChipView key={c.id} c={c} dz={lay.chips.get(c.id)} />)}</g>
       </svg>
     </K.Provider>
   );
