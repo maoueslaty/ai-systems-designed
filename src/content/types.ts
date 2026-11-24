@@ -38,6 +38,7 @@ export interface SNode {
   w?: number; d?: number; h?: number;
   state?: 'ok' | 'down' | 'hot' | 'dim' | 'warn';
   badge?: string;        // small corner badge (e.g. "×3")
+  pin?: { text: string; tone?: Tone; icon?: Glyph };  // status label pinned above the node ("API down", "attempt 4")
 }
 
 export interface SEdge {
@@ -82,6 +83,7 @@ export interface SChip {
   text: string;
   tone?: Tone;
   icon?: Glyph;
+  lead?: number;          // z of the anchor point: draws a leader line down to it (used by node pins)
 }
 
 // HTML overlays placed in % of the stage
@@ -120,6 +122,10 @@ export interface Step {
   changes?: { sign: '+' | '-' | '~'; text: string }[];
   metrics?: Record<string, string | number>;
   scene: Scene;
+  /** failure-injection toggle: the same step with something broken */
+  inject?: { label: string; scene: Scene; metrics?: Record<string, string | number>; note: string };
+  /** side-by-side comparison rendered instead of `scene` (scene is still used for transitions) */
+  compare?: { left: { label: string; scene: Scene }; right: { label: string; scene: Scene } };
 }
 
 export interface MetricDef { id: string; label: string; icon?: Glyph; good?: 'low' | 'high' }
@@ -150,7 +156,20 @@ export interface Scenario {
 
 export type PlaygroundId = 'cost' | 'token-tax' | 'sampling' | 'kv' | 'reliability' | 'budget' | 'claims-cost';
 
-export interface LessonExtras { senior?: DecisionRecord; quiz?: QuizQ[]; scenario?: Scenario; playground?: PlaygroundId }
+export type PatternFamily = 'traffic' | 'knowledge' | 'output' | 'tools' | 'orchestration' | 'trust' | 'serving' | 'quality' | 'modality';
+
+export interface PatternCard {
+  family: PatternFamily;
+  problem: string;      // one line: the pain
+  solution: string;     // one line: the mechanism
+  failure: string;      // the new failure mode the pattern introduces
+  whenNot: string;      // when not to use it
+  aws: string[];        // AWS building blocks
+  oss: string[];        // open-source equivalents
+  related?: string[];   // other lesson ids
+}
+
+export interface LessonExtras { senior?: DecisionRecord; quiz?: QuizQ[]; scenario?: Scenario; playground?: PlaygroundId; pattern?: PatternCard }
 
 export interface Lesson extends LessonExtras {
   id: string;
@@ -166,7 +185,7 @@ export interface Lesson extends LessonExtras {
 }
 
 export interface ChapterStory {
-  act: 0 | 1 | 2 | 3 | 4;     // 0 prologue, 4 epilogue (case study)
+  act: 0 | 1 | 2 | 3 | 4 | 5;  // 0 prologue, 4 pattern catalog, 5 epilogue (case study)
   why: string;                 // why this chapter matters, in plain words
   cost: string;                // the unit-economics lens: how it moves cost, latency or quality
   carry: string;               // what to carry into the next chapter
@@ -180,4 +199,14 @@ export interface Chapter {
   blurb: string;
   lessons: Lesson[];
   story?: ChapterStory;
+}
+
+/** design-interview mode: a prompt, then a sequence of decisions with graded options */
+export interface Interview {
+  id: string;
+  title: string;
+  prompt: string;
+  constraints: string[];
+  rounds: { q: string; options: { text: string; grade: 'best' | 'ok' | 'poor'; why: string }[] }[];
+  lessons: string[];      // lessons that teach the model answer
 }

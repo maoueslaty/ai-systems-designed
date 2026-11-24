@@ -8,7 +8,8 @@ export const ACTS = [
   { n: 1, label: 'Act I', title: 'How the machine works', thesis: 'Tokens, vectors, attention, generation and serving. Almost every cost, latency and failure you meet later is decided down here.' },
   { n: 2, label: 'Act II', title: 'Building the system', thesis: 'Context, retrieval, tools, MCP and agents: turning a model into a system that knows your data and can act on it, without paying for tokens it doesn\'t need.' },
   { n: 3, label: 'Act III', title: 'Running it for real', thesis: 'Evals, LLMOps, security and AWS architecture: the work that makes a demo safe, measurable and affordable in production.' },
-  { n: 4, label: 'Epilogue', title: 'One claim, end to end', thesis: 'Everything above, applied to a single US auto-insurance claim, from a WhatsApp photo at the roadside to the payment, with legacy systems and humans in the loop.' },
+  { n: 4, label: 'Act IV', title: 'The pattern catalog', thesis: 'The recurring designs senior teams reach for, one per lesson: the naive version, how it breaks, the pattern, the new failure it brings, and when not to use it.' },
+  { n: 5, label: 'Epilogue', title: 'One claim, end to end', thesis: 'Everything above, applied to a single US auto-insurance claim, from a WhatsApp photo at the roadside to the payment, with legacy systems and humans in the loop.' },
 ] as const;
 
 export const THREAD = {
@@ -108,7 +109,7 @@ export const STORY: Record<string, ChapterStory> = {
     carry: 'The epilogue applies the whole guide to one real-world problem: a US auto insurer\'s claims process.',
   },
   'case-study': {
-    act: 4,
+    act: 5,
     why: 'Concepts only matter when they change an outcome. Here they change how fast a driver gets paid after an accident, and what each claim costs to handle.',
     cost: 'The final number: AI cost per claim against adjuster minutes saved, cycle time and leakage. AI is usually a small line in the cost per claim; human time and delays are the big ones.',
     carry: 'That is the whole stack, from tokens to a paid claim. Take the patterns, not the boxes: the next customer will have a different legacy system and the same questions.',

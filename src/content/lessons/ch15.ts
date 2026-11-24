@@ -31,7 +31,7 @@ const c1s2 = S(asisAll, Object.values(aE), [F('mp', 'req', 0.5), F('mi', 'msg', 
   widgets: [{ type: 'kv', id: 'land', x: 0, y: 0, title: 'the as-is landscape', rows: [['channels', 'phone, email, agents'], ['systems of record', 'mainframe policy admin, claims app, ERP'], ['pricing', 'Excel sheets per state'], ['field work', 'independent appraisers, body shops']] }] });
 const c1s3 = S(asisAll.map(n => (n.id === 'handler' ? { ...n, state: 'hot' as const, badge: '23 touches' } : n)), Object.values(aE), [F('hc', 'msg', 1.1), F('hp', 'msg', 1.1), F('he', 'msg', 1.1), F('hx', 'msg', 0.8)], {
   widgets: [{ type: 'bars', id: 'tch', x: 0, y: 0, w: 300, title: 'handler touches per claim (illustrative)', items: [{ label: 're-keying', value: 9, tone: 'red', hi: true }, { label: 'chasing docs', value: 6, tone: 'amber' }, { label: 'appraiser calls', value: 4, tone: 'amber' }, { label: 'decisions', value: 4, tone: 'green' }] }] });
-const c1s4 = S(asisAll.map(n => (n.id === 'appr' ? { ...n, state: 'warn' as const } : n)), Object.values(aE), [F('ha', 'msg', 0.9, { text: ['photos', 'estimate.pdf', 'call me?'] }), F('as', 'msg', 0.6), F('mi', 'msg', 0.7)], {
+const c1s4 = S(asisAll.map(n => (n.id === 'appr' ? { ...n, state: 'warn' as const } : n.id === 'handler' ? { ...n, pin: { text: 'downloads, renames, re-uploads', tone: 'amber' as const, icon: 'loop' as const } } : n)), Object.values(aE), [F('ha', 'msg', 0.9, { text: ['photos', 'estimate.pdf', 'call me?'] }), F('as', 'msg', 0.6), F('mi', 'msg', 0.7)], {
   chips: [C('wa', 9.2, 9.2, 'evidence on personal phones', { tone: 'red', icon: 'x', z: 2 })],
   widgets: [{ type: 'kv', id: 'audit', x: 0, y: 0, title: 'what goes wrong', rows: [['photos', 'in personal WhatsApp threads', 'red'], ['estimates', 'PDF attachments, re-typed', 'red'], ['audit trail', 'incomplete', 'red'], ['follow-ups', 'manual reminders', 'amber']] }] });
 const c1s5 = S(asisAll.map(n => (n.id === 'xls' ? { ...n, state: 'warn' as const, badge: 'v17_final(2).xlsx' } : n)), Object.values(aE), [F('hx', 'msg', 0.8)], {
@@ -85,10 +85,10 @@ const c3s4 = S([...agentNodes.map(n => (n.id === 'ag2' || n.id === 'ag5' ? { ...
   chips: [C('reg', 14.4, -1.8, 'auto-denials: who explains them?', { tone: 'red', icon: 'shield', z: 0.6 })],
   widgets: [{ type: 'kv', id: 'reg', x: 0, y: 0, title: 'regulatory reality (US)', rows: [['NAIC AI model bulletin', 'adopted Dec 2023'], ['adopted by', '24 states + DC (2026)'], ['expects', 'a documented AI program, governance, testing'], ['adverse decisions', 'must be explainable', 'red']] }] });
 const RS = [
-  N('wf', 4.2, 4.6, { label: 'Claim workflow (Step Functions)', glyph: 'route', tone: 'cyan', w: 1.5, d: 1.5, h: 1 }),
+  N('wf', 4.2, 4.6, { label: 'Workflow (Step Functions)', glyph: 'route', tone: 'cyan', w: 1.5, d: 1.5, h: 1 }),
   N('ext', 0, 0, { label: 'Extraction (LLM)', glyph: 'doc', tone: 'llm', w: 1.2, d: 1.2, h: 0.8 }),
   N('rag', 4.2, 0, { label: 'Policy Q&A (RAG)', glyph: 'search', tone: 'violet', w: 1.2, d: 1.2, h: 0.8 }),
-  N('inv', 8.4, 0, { label: 'One investigation agent', glyph: 'bot', tone: 'llm', w: 1.2, d: 1.2, h: 0.8 }),
+  N('inv', 8.4, 0, { label: 'Investigation agent', glyph: 'bot', tone: 'llm', w: 1.2, d: 1.2, h: 0.8 }),
   N('mcp', 8.4, 4.6, { label: 'MCP: legacy systems', glyph: 'plug', tone: 'teal', w: 1.2, d: 1.2, h: 0.8 }),
   N('hitl', 4.2, 9.2, { kind: 'crowd', label: 'Adjuster decides', w: 1.4, d: 1.2 }),
 ];
@@ -259,7 +259,7 @@ const c8s7 = V(ALLN, ALLE, [F('m-wa', 'req', 0.4), F('in-sfn', 'req', 0.4), F('s
 const dec = (o: Partial<import('../types').DecisionRecord> & { context: string; decision: string; cto: string }) => ({ options: [], consequences: [], ...o });
 
 export const ch15: Chapter = {
-  id: 'case-study', num: '15', title: 'Case Study: Auto Claims', tone: 'pink',
+  id: 'case-study', num: '20', title: 'Case Study: Auto Claims', tone: 'pink',
   blurb: 'A fictional US auto insurer, one claim from a WhatsApp photo to payment: legacy systems, people, over-design vs right-size, AWS architecture, compliance and unit economics.',
   lessons: [
     {
@@ -368,6 +368,7 @@ export const ch15: Chapter = {
         { short: 'Principles', tag: 'solution', title: 'Right-sizing principles', scene: c3s5, metrics: { calls: '≈ 12', sys: '0 to run', ttp: '10 wk' },
           body: ['A <b>workflow</b> with explicit stages; LLM calls for extraction, Q&A and drafting; <b>one</b> agent where the work is open-ended; existing systems reached through <b>MCP</b>; and humans owning every adverse decision.'] },
         { short: 'Compare', tag: 'tradeoff', title: 'Side by side', scene: c3s6, metrics: { calls: '≈ 12', sys: '0 to run', ttp: '10 wk' },
+          compare: { left: { label: 'Pitched: 8 agents + 4 platforms', scene: S(agentNodes, meshEdges, meshEdges.map(e => F(e.id, 'msg', 0.4))) }, right: { label: 'Shipped: workflow + 1 agent', scene: S(RS, rsE, rsE.map(e => F(e.id, 'msg', 0.6))) } },
           body: ['The right-sized design is less impressive in a slide and much better in production: an order of magnitude fewer calls, predictable cost, and accountability that compliance can sign.'],
           callout: { kind: 'fde', text: 'Seniority shows in what you leave out. Write down why each rejected component was rejected; it saves the same debate every quarter.' } },
       ],
@@ -408,6 +409,10 @@ export const ch15: Chapter = {
         { short: 'AI layer', tag: 'aws', title: 'The AI layer', scene: c4s3, metrics: { layer: 'AI', svc: 10 },
           body: ['<b>Textract</b> reads police reports and estimates; <b>Bedrock</b> models extract structured fields, triage damage photos, summarise and draft letters; a <b>Knowledge Base</b> on OpenSearch answers coverage questions from policy forms and state endorsements, with citations.'] },
         { short: 'Legacy', tag: 'aws', title: 'Legacy stays, behind MCP', scene: c4s4, metrics: { layer: 'legacy', svc: 13 },
+          inject: { label: 'mainframe offline', note: 'The nightly batch window takes the mainframe offline. <code>get_policy</code> times out; the workflow retries with backoff, then parks the claim with a task token and tells the claimant when to expect an answer. Nothing is guessed.',
+            metrics: { layer: 'degraded' },
+            scene: V([...CORE, ...AI, ...LEG], [...coreE, ...aiE, ...legE], [F('sfn-gw', 'tool', 0.9, { text: ['get_policy'] }), F('gw-ad', 'tool', 0.9), F('ad-vpn', 'fail', 0.9, { dropAt: 0.7 })], {
+              zones: [onPrem], patch: { pas: { state: 'down', pin: { text: 'batch window', tone: 'red', icon: 'clock' } }, sfn: { pin: { text: 'retry 3/3, then park', tone: 'amber', icon: 'loop' } } } }) },
           body: ['The mainframe, claims app and ERP are not touched in phase 1. Small Lambda adapters reach them over a <b>Site-to-Site VPN</b>, and <b>AgentCore Gateway</b> exposes them as scoped MCP tools (get_policy, create_claim, create_payment_draft).',
             'Pricing sheets become versioned <b>DynamoDB</b> tables still owned by the pricing team.'] },
         { short: 'Humans', tag: 'aws', title: 'Humans are part of the architecture', scene: c4s5, metrics: { layer: 'people', svc: 15 },

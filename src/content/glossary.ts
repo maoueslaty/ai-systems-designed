@@ -1,6 +1,12 @@
+import { terms as tTraffic } from './lessons/pat_traffic';
+import { terms as tKnowledge } from './lessons/pat_knowledge';
+import { terms as tAgents } from './lessons/pat_agents';
+import { terms as tTrust } from './lessons/pat_trust';
+import { terms as tServing } from './lessons/pat_serving';
+
 export interface Term { term: string; alt?: string[]; def: string; lesson?: string }
 
-export const GLOSSARY: Term[] = [
+const BASE: Term[] = [
   { term: 'Token', alt: ['tokens'], def: 'The unit an LLM reads and writes: a word, part of a word, byte sequence or symbol, mapped to an integer ID.', lesson: 'tokenization-bpe' },
   { term: 'Tokenizer', def: 'The component that converts text to token IDs and back. Most LLMs use byte-level BPE or SentencePiece.', lesson: 'tokenization-bpe' },
   { term: 'BPE', alt: ['byte-pair encoding'], def: 'A subword algorithm that starts from bytes or characters and repeatedly merges the most frequent adjacent pair into a new vocabulary entry.', lesson: 'tokenization-bpe' },
@@ -91,3 +97,5 @@ export const GLOSSARY: Term[] = [
   { term: 'Task token', def: 'A Step Functions token that pauses a workflow until an external party, such as a person approving a step, calls back with a result.', lesson: 'claims-target-architecture' },
   { term: 'AWS End User Messaging Social', def: 'AWS service for WhatsApp Business messaging; inbound messages are published to an SNS topic.', lesson: 'claims-target-architecture' },
 ];
+
+export const GLOSSARY: Term[] = [...BASE, ...tTraffic, ...tKnowledge, ...tAgents, ...tTrust, ...tServing];

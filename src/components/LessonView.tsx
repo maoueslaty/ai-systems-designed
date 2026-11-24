@@ -38,8 +38,16 @@ export function LessonView({ chapter, lesson, stepParam, next, onMark }:
   const [epoch, setEpoch] = useState(0);
   const prevIds = useRef<Set<string>>(new Set());
   const lastIdx = useRef(-1);
-  const frames = useMemo(() => { const all = sceneBounds(steps.map(s => s.scene)); return steps.map(s => frameBounds(sceneBounds([s.scene]), all)); }, [steps]);
+  const frames = useMemo(() => {
+    const all = sceneBounds(steps.flatMap(s => (s.inject ? [s.scene, s.inject.scene] : [s.scene])));
+    return steps.map(s => frameBounds(sceneBounds(s.inject ? [s.scene, s.inject.scene] : [s.scene]), all));
+  }, [steps]);
   const bounds = frames[idx] ?? { x: 0, y: 0, w: 100, h: 100 };
+  const [inj, setInj] = useState(() => /i$/.test(stepParam ?? ''));
+  useEffect(() => { setInj(/i$/.test(stepParam ?? '')); }, [stepParam]);
+  const injected = !!(inj && step?.inject);
+  const shown = step ? (injected ? step.inject!.scene : step.scene) : undefined;
+  const cmpBounds = useMemo(() => step?.compare ? [sceneBounds([step.compare.left.scene], 110), sceneBounds([step.compare.right.scene], 110)] : null, [step]);
   const lessonNo = chapter.lessons.indexOf(lesson) + 1;
 
   useEffect(() => { setModeRaw(initial()); setQuizScore(readQuiz()[lesson.id]); lastIdx.current = -1; prevIds.current = new Set(); // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -67,6 +75,7 @@ export function LessonView({ chapter, lesson, stepParam, next, onMark }:
       else if (e.key === 'ArrowLeft') goStep(idx - 1);
       else if (e.key === ' ') { e.preventDefault(); setPaused(p => !p); }
       else if (e.key.toLowerCase() === 'r') setEpoch(x => x + 1);
+      else if (e.key.toLowerCase() === 'b' && step?.inject) setInj(v => !v);
     };
     window.addEventListener('keydown', on);
     return () => window.removeEventListener('keydown', on);
@@ -81,7 +90,7 @@ export function LessonView({ chapter, lesson, stepParam, next, onMark }:
     });
   }, [step]);
 
-  const metricVals = step?.metrics ?? {};
+  const metricVals = { ...(step?.metrics ?? {}), ...(injected ? step!.inject!.metrics ?? {} : {}) };
   const prevMetrics = idx > 0 ? steps[idx - 1].metrics ?? {} : {};
 
   return (
@@ -117,13 +126,29 @@ export function LessonView({ chapter, lesson, stepParam, next, onMark }:
                   );
                 })}
                 <div className="ctrls">
+                  {step.inject && (
+                    <button className={`btn inject ${injected ? 'on' : ''}`} onClick={() => setInj(v => !v)} aria-pressed={injected} title="Break it (B)">
+                      <Icon g={injected ? 'check' : 'bolt'} size={14} />{injected ? 'Restore' : `Break it: ${step.inject.label}`}
+                    </button>
+                  )}
                   <button className="btn" onClick={() => setEpoch(x => x + 1)} title="Replay (R)"><Icon g="loop" size={14} />Replay</button>
                   <button className="btn" onClick={() => setPaused(p => !p)} title="Pause (Space)" aria-pressed={paused}><Icon g={paused ? 'bolt' : 'clock'} size={14} />{paused ? 'Play' : 'Pause'}</button>
                 </div>
               </div>
-              <div className="stage">
-                <SceneView scene={step.scene} prev={prev} bounds={bounds} paused={paused} epoch={epoch} dock="none" />
-              </div>
+              {step.compare && cmpBounds ? (
+                <div className="stage split">
+                  {([['left', step.compare.left, cmpBounds[0]], ['right', step.compare.right, cmpBounds[1]]] as const).map(([k, side, b]) => (
+                    <div key={`${idx}-${k}`} className={`half half-${k}`}>
+                      <div className="half-h">{side.label}</div>
+                      <div className="half-s"><SceneView scene={side.scene} prev={new Set()} bounds={b} paused={paused} epoch={epoch} dock="none" /></div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className={`stage ${injected ? 'broken' : ''}`}>
+                  <SceneView scene={shown!} prev={prev} bounds={bounds} paused={paused} epoch={epoch} dock="none" />
+                </div>
+              )}
               {lesson.legend && (
                 <div className="legend">
                   {lesson.legend.map(k => <span key={k}><i style={{ background: LEGEND[k][1] }} />{LEGEND[k][0]}</span>)}
@@ -155,6 +180,7 @@ export function LessonView({ chapter, lesson, stepParam, next, onMark }:
               <div className="sc-top"><span>Step {idx + 1} / {steps.length}</span><span className={`tag-pill tag-${step.tag}`}>{TAGS[step.tag]}</span></div>
               <div key={`${lesson.id}-${idx}`} className="body-anim" ref={bodyRef}>
                 <h2 className="sc-title">{step.title}</h2>
+                {injected && <div className="callout callout-warn inj-note"><span className="ci"><Icon g="bolt" size={15} /></span><div><b className="ct">Broken: {step.inject!.label}</b><span dangerouslySetInnerHTML={{ __html: step.inject!.note }} /></div></div>}
                 <div className="sc-body">{step.body.map((b, i) => <p key={i} dangerouslySetInnerHTML={{ __html: b }} />)}</div>
                 {(step.scene.widgets ?? []).length > 0 && <Widgets widgets={step.scene.widgets!} epoch={epoch} panel />}
                 {step.callout && (
@@ -181,7 +207,7 @@ export function LessonView({ chapter, lesson, stepParam, next, onMark }:
                   ? <button className="btn primary" onClick={() => goStep(idx + 1)}>Next: {steps[idx + 1].short}</button>
                   : <button className="btn primary" onClick={() => setMode(practice ? 'practice' : 'notes')}>{practice ? 'Test yourself' : 'Read the field notes'}</button>}
               </div>
-              <div className="keys"><span><kbd>←</kbd> <kbd>→</kbd> steps</span><span><kbd>R</kbd> replay</span><span><kbd>Space</kbd> pause</span></div>
+              <div className="keys"><span><kbd>←</kbd> <kbd>→</kbd> steps</span><span><kbd>R</kbd> replay</span><span><kbd>Space</kbd> pause</span>{step.inject && <span><kbd>B</kbd> break it</span>}</div>
             </div>
             {lesson.goals && (
               <div className="card goals">

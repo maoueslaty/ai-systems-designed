@@ -8,6 +8,9 @@ import { Icon } from './engine/glyphs';
 import { sceneBounds } from './engine/iso';
 import { SceneView } from './engine/Scene';
 import { LessonView } from './components/LessonView';
+import { Catalog } from './components/Catalog';
+import { InterviewList, InterviewView } from './components/Interview';
+import { INTERVIEWS } from './content/interviews';
 import { go, useHashRoute, useProgress, useTheme } from './store';
 
 const AUTHOR = { name: 'Mohamed Achraf Oueslati', linkedin: 'https://www.linkedin.com/in/mohamed-achref-oueslati-431539223', github: 'https://github.com/maoueslaty' };
@@ -157,19 +160,20 @@ function Home() {
 
       {ACTS.map(act => {
         const chs = CHAPTERS.filter(c => c.story?.act === act.n);
-        if (act.n === 4) return null;
+        if (act.n === 5 || chs.length === 0) return null;
         return (
           <section key={act.n} className="sec act">
             <div className="act-head"><span className="act-l">{act.label}</span><h2>{act.title}</h2></div>
             <p>{act.thesis}</p>
             <div className="chlist">{chs.map(ch => <ChapterRow key={ch.id} ch={ch} />)}</div>
+            {act.n === 4 && <p className="act-more"><a className="btn" href="#/patterns">Browse all patterns</a><a className="btn" href="#/interview">Try a design interview</a></p>}
           </section>
         );
       })}
 
       <section className="sec epilogue">
-        <div className="act-head"><span className="act-l">{ACTS[4].label}</span><h2>{ACTS[4].title}</h2></div>
-        <p>{ACTS[4].thesis}</p>
+        <div className="act-head"><span className="act-l">{ACTS[5].label}</span><h2>{ACTS[5].title}</h2></div>
+        <p>{ACTS[5].thesis}</p>
         <div className="epi">
           <div className="epi-stage">
             <SceneView scene={CASE_SCENE} prev={new Set(CASE_SCENE.nodes.map(n => n.id))} bounds={caseBounds} paused={false} epoch={0} dock="none" />
@@ -336,6 +340,9 @@ export default function App() {
     const flat = ALL_LESSONS; const i = flat.indexOf(found.lesson);
     content = <LessonView key={found.lesson.id} chapter={found.chapter} lesson={found.lesson} stepParam={b} next={flat[i + 1]} onMark={onMark} />;
   } else if (page === 'chapter' && CHAPTERS.some(c => c.id === a)) { content = <ChapterPage key={a} ch={CHAPTERS.find(c => c.id === a)!} />; right = false; }
+  else if (page === 'patterns') { content = <Catalog />; right = false; }
+  else if (page === 'interview' && a && INTERVIEWS.some(i => i.id === a)) { content = <InterviewView key={a} iv={INTERVIEWS.find(i => i.id === a)!} />; right = false; }
+  else if (page === 'interview') { content = <InterviewList />; right = false; }
   else if (page === 'glossary') { content = <Glossary />; right = false; }
   else if (page === 'about') { content = <About />; right = false; }
   else { content = <Home />; right = false; }
@@ -348,6 +355,8 @@ export default function App() {
         <a className="brand" href="#/"><Logo /><span>AI Systems, Designed</span></a>
         <nav className="nav">
           <a href="#/learn/ai-system-map" className={page === 'learn' || page === 'chapter' ? 'on' : ''}><Icon g="layers" size={15} /><span>Learn</span></a>
+          <a href="#/patterns" className={page === 'patterns' ? 'on' : ''}><Icon g="grid" size={15} /><span>Patterns</span></a>
+          <a href="#/interview" className={page === 'interview' ? 'on' : ''}><Icon g="scale" size={15} /><span>Interview</span></a>
           <a href="#/glossary" className={page === 'glossary' ? 'on' : ''}><Icon g="hash" size={15} /><span>Glossary</span></a>
           <a href="#/about" className={page === 'about' ? 'on' : ''}><Icon g="user" size={15} /><span>About</span></a>
         </nav>

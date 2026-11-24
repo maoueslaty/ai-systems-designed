@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { PKind, Scene, SChip, SEdge, SNode, SZone } from '../content/types';
 import { GlyphPath } from './glyphs';
-import { HZ, edgePoints, nodeSize, pointAt, polyLength, proj, type Bounds } from './iso';
+import { HZ, edgePoints, expandPins, nodeSize, pointAt, polyLength, proj, type Bounds } from './iso';
 import { Widgets } from './Widgets';
 
 // Official AWS Architecture Icons, inlined as vectors (same artwork as draw.io's mxgraph.aws4 library)
@@ -340,6 +340,7 @@ function ChipView({ c, dz = 0 }: { c: SChip; dz?: number }) {
   const tone = c.tone ?? 'green';
   return (
     <g className="chip" data-chip={c.id} style={{ transform: `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px)` }}>
+      {c.lead !== undefined && <line className="pin-lead" x1={0} y1={ht / 2} x2={0} y2={Math.max(ht / 2, ((c.z ?? 1.4) + dz - c.lead) * HZ)} style={{ stroke: tv(tone, 'l') }} />}
       <g className="chip-inner">
         <rect x={-wt / 2} y={-ht / 2} width={wt} height={ht} rx={6 * k} style={{ fill: tv(tone, 'z2'), stroke: tv(tone, 'l') }} />
         {c.icon && <GlyphPath g={c.icon} x={-wt / 2 + 15 * k} y={0} size={13 * k} color={tv(tone, 'l')} sw={2.3 * k} />}
@@ -493,13 +494,20 @@ function useCamera(ref: React.RefObject<SVGSVGElement | null>, target: Bounds) {
   }, [ref, target.x, target.y, target.w, target.h]);
 }
 
-function SceneSvg({ scene, prev, bounds, paused, epoch }:
+function SceneSvg({ scene: raw, prev, bounds, paused, epoch }:
   { scene: Scene; prev: Set<string>; bounds: Bounds; paused: boolean; epoch: number }) {
+  const scene = useMemo(() => expandPins(raw), [raw]);
   const svgRef = useRef<SVGSVGElement>(null);
-  useCamera(svgRef, bounds);
   const kRaw = useScale(svgRef, bounds);
   // labels keep a constant size when there is room; on cramped stages they shrink partway with the drawing
   const k = kRaw > 1 ? Math.round((1 + (kRaw - 1) * 0.55) * 100) / 100 : kRaw;
+  // bounds estimate labels at k = 1; when labels grow in user units, widen the frame so edge labels stay inside
+  const framed = useMemo(() => {
+    if (k <= 1) return bounds;
+    const ex = 70 * (k - 1), ey = 16 * (k - 1);
+    return { x: bounds.x - ex, y: bounds.y - ey, w: bounds.w + 2 * ex, h: bounds.h + 2 * ey };
+  }, [bounds, k]);
+  useCamera(svgRef, framed);
   const byId = useMemo(() => new Map(scene.nodes.map(n => [n.id, n])), [scene]);
   const edges = useMemo(() => (scene.edges ?? []).map(e => ({ e, p: edgeScreen(e, byId) })).filter(x => x.p) as { e: SEdge; p: [number, number][] }[], [scene, byId]);
   const paths = useMemo(() => {

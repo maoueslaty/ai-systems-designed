@@ -25,7 +25,15 @@ export function nodeRadius(n: SNode) {
 
 export interface Bounds { x: number; y: number; w: number; h: number }
 
+/** status pins on nodes become chips anchored above the node */
+export function expandPins(s: Scene): Scene {
+  const pins = s.nodes.filter(n => n.pin);
+  if (!pins.length) return s;
+  return { ...s, chips: [...(s.chips ?? []), ...pins.map(n => ({ id: `pin-${n.id}`, at: n.at, z: (n.z ?? 0) + nodeSize(n).h + (n.kind === 'aws' ? 2.5 : n.kind === 'crowd' ? 1.7 : 1.05), text: n.pin!.text, tone: n.pin!.tone ?? 'amber', icon: n.pin!.icon, lead: (n.z ?? 0) + nodeSize(n).h + (n.kind === 'aws' ? 1.2 : 0.1) }))] };
+}
+
 export function sceneBounds(scenes: Scene[], pad = 26): Bounds {
+  scenes = scenes.map(expandPins);
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   const add = (p: [number, number]) => {
     minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);

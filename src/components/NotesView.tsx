@@ -1,4 +1,6 @@
 import type { Chapter, Lesson } from '../content/types';
+import { ALL_LESSONS } from '../content/curriculum';
+import { FAMILIES } from '../content/patterns';
 import { Icon } from '../engine/glyphs';
 
 export function NotesView({ chapter, lesson, animated, next }: { chapter: Chapter; lesson: Lesson; animated: boolean; next?: Lesson }) {
@@ -11,6 +13,7 @@ export function NotesView({ chapter, lesson, animated, next }: { chapter: Chapte
       {!animated && (
         <div className="soon"><Icon g="layers" size={16} />Written notes: key ideas, best practices and edge cases, without an animated walkthrough.</div>
       )}
+      {lesson.pattern && <PatternCardView lesson={lesson} />}
       {d && (
         <section className="senior">
           <h3><Icon g="scale" size={16} />Senior lens: the decision</h3>
@@ -36,5 +39,29 @@ export function NotesView({ chapter, lesson, animated, next }: { chapter: Chapte
       )}
       {next && <p style={{ marginTop: 28 }}><a className="btn primary" href={`#/learn/${next.id}`}>Next lesson: {next.title}</a></p>}
     </div></div>
+  );
+}
+
+export function PatternCardView({ lesson, compact = false }: { lesson: Lesson; compact?: boolean }) {
+  const p = lesson.pattern!;
+  const fam = FAMILIES[p.family];
+  return (
+    <section className={`pcard ${compact ? 'compact' : ''}`} style={{ ['--c' as string]: `var(--t-${fam.tone}-l)` }}>
+      {!compact && <h3><Icon g="layers" size={16} />Pattern card</h3>}
+      <div className="pc-fam">{fam.label}</div>
+      <div className="pc-grid">
+        <div><span>Problem</span><p>{p.problem}</p></div>
+        <div><span>Pattern</span><p>{p.solution}</p></div>
+        <div className="bad"><span>New failure it brings</span><p>{p.failure}</p></div>
+        <div className="warn"><span>When not to use it</span><p>{p.whenNot}</p></div>
+      </div>
+      <div className="pc-map">
+        <div><span>On AWS</span>{p.aws.map(a => <i key={a}>{a}</i>)}</div>
+        <div><span>Open source</span>{p.oss.map(a => <i key={a}>{a}</i>)}</div>
+      </div>
+      {!compact && p.related && p.related.length > 0 && (
+        <div className="pc-rel"><span>Related</span>{p.related.map(id => { const l = ALL_LESSONS.find(x => x.id === id); return l ? <a key={id} href={`#/learn/${id}`}>{l.title}</a> : null; })}</div>
+      )}
+    </section>
   );
 }
