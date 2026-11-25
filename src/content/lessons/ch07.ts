@@ -1,5 +1,5 @@
 import type { Chapter, Scene } from '../types';
-import { A, C, E, F, N, S } from '../dsl';
+import { A, E, F, N, S } from '../dsl';
 
 // ── Production RAG pipeline ──
 const S3 = A('s3', 0, 0, 'AmazonSimpleStorageService', 'Source docs (S3)');
@@ -16,9 +16,8 @@ const qE = [E('u-a', 'usr', 'api'), E('a-o', 'api', 'os', { label: 'search', lab
 
 const s1: Scene = S([...ingest, USR, API, LLM], [...ingestE, ...qE], [...ingestF(), F('u-a', 'req', 1), F('a-o', 'vec', 1), F('a-o', 'ctx', 1, { reverse: true }), F('a-l', 'ctx', 1), F('a-l', 'token', 1, { reverse: true })], {
   widgets: [{ type: 'code', id: 'n', x: 0, y: 0, w: 330, title: 'naive RAG', lines: ['chunks = split(doc, 1000 chars)', 'index(embed(chunks))', 'hits = knn(embed(question), k=5)', 'answer = llm(question + hits)'] }] });
-const s2: Scene = S([...ingest, USR, API, LLM], [...ingestE, ...qE], [...ingestF(), F('u-a', 'req', 1), F('a-o', 'vec', 1), F('a-l', 'fail', 1, { dropAt: 0.7 })], {
-  widgets: [{ type: 'tokens', id: 'cut', x: 0, y: 0, title: 'fixed-size chunk boundary cuts the table', items: [{ t: '…Deductible by plan:' }, { t: '| Basic | 500 € |', tone: 'amber' }, { t: '‖ chunk break ‖', tone: 'red' }, { t: '| Plus | 250 € |', dim: true }, { t: '(applies to water damage)', dim: true }] }],
-  chips: [C('w', 13.6, 5.6, '"deductible is 500 €" (wrong plan)', { tone: 'red', icon: 'x', z: 2.6 })] });
+const s2: Scene = S([...ingest.map(n => (n.id === 'os' ? { ...n, pin: { text: 'half a table retrieved', tone: 'amber' as const, icon: 'split' as const } } : n)), USR, API, { ...LLM, state: 'warn' as const }], [...ingestE, ...qE], [...ingestF(), F('u-a', 'req', 1), F('a-o', 'vec', 1), F('a-l', 'fail', 1, { dropAt: 0.7 })], {
+  widgets: [{ type: 'tokens', id: 'cut', x: 0, y: 0, title: 'fixed-size chunk boundary cuts the table', items: [{ t: '…Deductible by plan:' }, { t: '| Basic | 500 € |', tone: 'amber' }, { t: '‖ chunk break ‖', tone: 'red' }, { t: '| Plus | 250 € |', dim: true }, { t: '(applies to water damage)', dim: true }] }] });
 const s3: Scene = S([...ingest, USR, API, LLM].map(n => (n.id === 'chk' ? { ...n, label: 'smart chunker', state: 'hot' as const } : n)), [...ingestE, ...qE], [...ingestF(1.2), F('u-a', 'req', 0.6)], {
   widgets: [{ type: 'code', id: 'cc', x: 0, y: 0, w: 380, title: 'chunk = context header + section', lines: ['// header added before embedding & BM25', 'Doc: Home policy 2026 · §4 Deductibles', 'Context: deductibles per plan for water damage.', '| Basic | 500 € | Plus | 250 € | Premium | 0 € |'] },
     { type: 'kv', id: 'r', x: 0, y: 0, w: 260, title: 'Anthropic, Contextual Retrieval', rows: [['contextual emb. + BM25', '−49% failed retrievals', 'green'], ['+ reranking', '−67%', 'green']] }] });
@@ -130,6 +129,11 @@ export const ch07: Chapter = {
     {
       id: 'chunking-strategies', title: 'Chunking Strategies', minutes: 7, level: 'intermediate',
       summary: 'Fixed, recursive, semantic and hierarchical chunking, and how to pick sizes with evidence.',
+      quiz: [
+        { q: 'What does parent-child (small-to-big) retrieval do?', options: ['Embeds whole documents only', 'Matches on small chunks and returns their larger parent section', 'Splits on token count only', 'Skips embeddings'], answer: 1, why: 'Small chunks match precisely; the parent gives the model enough context.' },
+        { q: 'How should chunk size and overlap be chosen?', options: ['Always 512 tokens', 'By sweeping a few settings and measuring recall@k on your eval set', 'Whatever the framework defaults to', 'The largest the model accepts'], answer: 1, why: 'The best size depends on your documents and questions; measure it.' },
+        { q: 'What is a common failure of heavy overlap?', options: ['Lower storage', 'Top-k filled with near-duplicate chunks', 'Faster search', 'Better citations'], answer: 1, why: 'Duplicates crowd out other relevant passages.' },
+      ],
       notes: {
         key: [
           'Chunk size trades precision (small chunks match specific questions) against context (large chunks carry surrounding meaning).',
@@ -151,6 +155,11 @@ export const ch07: Chapter = {
     {
       id: 'advanced-rag', title: 'GraphRAG & Agentic RAG', minutes: 8, level: 'advanced',
       summary: 'When plain top-k is not enough: multi-hop questions, knowledge graphs, and letting an agent decide what to search.',
+      quiz: [
+        { q: 'Which question suits GraphRAG better than top-k retrieval?', options: ['"What is the deductible on plan Basic?"', '"Which suppliers are linked to delayed claims across regions?"', '"Translate this paragraph."', '"What is our refund email address?"'], answer: 1, why: 'Multi-hop questions over entities and relations are what a graph is built for.' },
+        { q: 'Where should an aggregate question like "total paid in Q3" go?', options: ['Vector search over PDFs', 'Text-to-SQL on structured data', 'A bigger top-k', 'The model\'s memory'], answer: 1, why: 'Numbers live in tables; do not embed them and hope.' },
+        { q: 'What must every agentic search loop have?', options: ['A larger model', 'Caps on iterations and a logged trail of queries', 'No tools', 'Only one source'], answer: 1, why: 'Without caps, loops cost latency and money; logs make them evaluable.' },
+      ],
       notes: {
         key: [
           '<b>GraphRAG</b>: extract entities and relations into a graph, use community summaries or graph traversal for global or multi-hop questions (“which suppliers are linked to delayed claims?”).',
@@ -175,6 +184,11 @@ export const ch07: Chapter = {
     {
       id: 'rag-evaluation', title: 'Evaluating RAG', minutes: 6, level: 'intermediate',
       summary: 'Retrieval metrics, faithfulness, answer relevance and the reference-free judges that measure them.',
+      quiz: [
+        { q: 'Why evaluate retrieval and generation separately?', options: ['It is cheaper', 'So you know which half to fix when quality drops', 'Judges require it', 'Generation cannot be measured'], answer: 1, why: 'A bad answer from good chunks and a bad answer from bad chunks need different fixes.' },
+        { q: 'What does faithfulness measure?', options: ['Whether the answer is short', 'Whether each claim is supported by the provided context', 'Retrieval speed', 'User satisfaction'], answer: 1, why: 'It checks grounding in the retrieved context, not general truth.' },
+        { q: 'What must you do before trusting an LLM-judge metric?', options: ['Use the largest judge model', 'Calibrate it against a sample of human labels', 'Run it once', 'Hide it from the team'], answer: 1, why: 'An uncalibrated judge can trend in the wrong direction.' },
+      ],
       notes: {
         key: [
           'Retrieval: recall@k, precision@k, MRR, nDCG against labelled relevant chunks.',
