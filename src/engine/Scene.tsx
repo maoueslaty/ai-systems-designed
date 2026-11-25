@@ -127,24 +127,31 @@ function layoutLabels(nodes: SNode[], edges: { e: SEdge; p: [number, number][] }
     const own = c.id.startsWith('pin-') ? c.id.slice(4) : undefined;
     const step = (ht + 4 * k) / HZ, side = wt / 2 + 24 * k;
     const cands: [number, number][] = [];
-    for (const a of [0, 1, 2, 3, 4]) for (const b of [0, 1, -1, 2, -2]) cands.push([a * step, b * side]);
-    cands.sort((p, q) => (Math.abs(p[0] / step) + Math.abs(p[1] / side) * 1.1) - (Math.abs(q[0] / step) + Math.abs(q[1] / side) * 1.1));
+    for (const a of [0, 1, 2, 3, 4, 5]) for (const b of [0, 1, -1, 2, -2]) cands.push([a * step, b * side]);
+    // pins may also sit under their node, below its tag
+    if (own) for (const a of [1, 2, 3]) for (const b of [0, 1, -1]) cands.push([-(c.z ?? 1.4) - 0.2 - a * step, b * side]);
+    const cost = ([dz, dx]: [number, number]) => Math.abs(dz / step) + Math.abs(dx / side) * 1.1 + (dz < 0 ? 1.5 : 0);
+    cands.sort((p, q) => cost(p) - cost(q));
+    const rectAt = ([dz, dx]: [number, number]): Rect => { const [x, y] = proj(c.at[0], c.at[1], (c.z ?? 1.4) + dz); return [x + dx - wt / 2, y - ht / 2, x + dx + wt / 2, y + ht / 2]; };
     let pick: [number, number] | null = null;
-    for (const [dz, dx] of cands) {
-      const [x, y] = proj(c.at[0], c.at[1], (c.z ?? 1.4) + dz);
-      const r: Rect = [x + dx - wt / 2, y - ht / 2, x + dx + wt / 2, y + ht / 2];
-      if (inFrame(r) && clearOf(r, own)) { pick = [dz, dx]; placed.push(r); break; }
+    for (const cd of cands) {
+      const r = rectAt(cd);
+      if (inFrame(r) && clearOf(r, own)) { pick = cd; placed.push(r); break; }
     }
     if (!pick) {
-      // nothing fully clear: fall back to clearing labels only, rising as before
-      let dz = 0;
-      for (let i = 0; i < 6; i++) {
-        const [x, y] = proj(c.at[0], c.at[1], (c.z ?? 1.4) + dz);
-        const r: Rect = [x - wt / 2, y - ht / 2, x + wt / 2, y + ht / 2];
-        if (!placed.some(q => hit(r, q, -2 * k))) { placed.push(r); break; }
-        dz += step;
+      // nothing fully clear: take the in-frame spot with the least overlap, bodies weighted most
+      const area = (r: Rect, q: Rect) => Math.max(0, Math.min(r[2], q[2]) - Math.max(r[0], q[0])) * Math.max(0, Math.min(r[3], q[3]) - Math.max(r[1], q[1]));
+      let best = Infinity;
+      for (const cd of cands) {
+        const r = rectAt(cd);
+        if (!inFrame(r)) continue;
+        let o = 0;
+        for (const [id, b] of bodies) if (id !== own) o += 3 * area(r, b);
+        for (const q of placed) o += area(r, q);
+        if (o < best) { best = o; pick = cd; }
       }
-      pick = [dz, 0];
+      pick = pick ?? [0, 0];
+      placed.push(rectAt(pick));
     }
     out.chips.set(c.id, { dz: pick[0], dx: pick[1] });
   }

@@ -1,5 +1,5 @@
 import type { Chapter, Scene } from '../types';
-import { C, E, F, N, S } from '../dsl';
+import { E, F, N, S } from '../dsl';
 
 // ── From text to tokens (byte-level BPE) ──
 const DOC = N('doc', 0, 3, { kind: 'doc', label: 'raw text', glyph: 'doc' });
@@ -39,7 +39,6 @@ const s6: Scene = S(pipe.map(n => (n.id === 'llm' ? { ...n, badge: '×2.6' } : n
 });
 const s7: Scene = S(pipe.map(n => (n.id === BPE.id ? { ...n, pin: { text: 'special tokens are IDs too', tone: 'violet' as const, icon: 'hash' as const } } : n)), pipeE, pipeF(), {
   widgets: [{ type: 'code', id: 'tpl', x: 0, y: 0, w: 330, title: 'a chat template (generic, illustrative)', lines: ['<|begin|><|system|>', 'You are a claims assistant.<|end|>', '<|user|>', 'Status of claim 42?<|end|>', '<|assistant|>', '// model continues from here…'] }],
-  chips: [C('sp', 10.2, 3, 'special tokens are just IDs too', { tone: 'violet', icon: 'hash', z: 1.2 })],
 });
 const s8: Scene = S(pipe, pipeE, pipeF(['20', '24', ' 2024']), {
   widgets: [{ type: 'tokens', id: 'n', x: 0, y: 0, title: 'surprises (tokenizer-dependent, illustrative)', items: [{ t: '2024', id: 'A' }, { t: ' 2024', id: 'B', tone: 'amber' }, { t: '12', id: '' }, { t: '345', id: '', tone: 'red' }, { t: '·def', id: '' }, { t: '····', id: 'indent', tone: 'violet' }] },
