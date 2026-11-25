@@ -55,8 +55,9 @@ const s7: Scene = S([...fullNodes, OB], obsEdges, obsFlows, {
   widgets: [{ type: 'kv', id: 'eval', x: 2, y: 4, w: 220, title: 'eval run #128', rows: [['faithfulness', '0.94', 'green'], ['answer relevance', '0.91', 'green'], ['tool-arg validity', '0.99', 'green'], ['p95 latency', '3.8 s', 'amber'], ['cost / task', '$0.021']] }],
 });
 
-const s8: Scene = S([...fullNodes, { ...OB, pin: { text: 'Ch 11–12: evals and ops', tone: 'green' as const } }], obsEdges, obsFlows, {
+const s8: Scene = S([...fullNodes, OB], obsEdges, obsFlows, {
   chips: [
+    C('c5', 17.6, 12, 'Ch 11–12: evals and ops', { tone: 'green', z: 0.8 }),
     C('c1', 16, 3.2, 'Ch 01–05: the model', { tone: 'pink', z: 2.2 }),
     C('c2', 8, -1.6, 'Ch 02 and 07: retrieval', { tone: 'violet', z: 1.9 }),
     C('c3', 12, -1.6, 'Ch 08–09: tools and MCP', { tone: 'teal', z: 2.1 }),

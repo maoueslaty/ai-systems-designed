@@ -47,7 +47,7 @@ export function LessonView({ chapter, lesson, stepParam, next, onMark }:
   useEffect(() => { setInj(/i$/.test(stepParam ?? '')); }, [stepParam]);
   const injected = !!(inj && step?.inject);
   const shown = step ? (injected ? step.inject!.scene : step.scene) : undefined;
-  const cmpBounds = useMemo(() => step?.compare ? [sceneBounds([step.compare.left.scene], 36), sceneBounds([step.compare.right.scene], 36)] : null, [step]);
+  const cmpBounds = useMemo(() => step?.compare ? [sceneBounds([step.compare.left.scene], 46), sceneBounds([step.compare.right.scene], 46)] : null, [step]);
   const lessonNo = chapter.lessons.indexOf(lesson) + 1;
 
   useEffect(() => { setModeRaw(initial()); setQuizScore(readQuiz()[lesson.id]); lastIdx.current = -1; prevIds.current = new Set(); // eslint-disable-next-line react-hooks/exhaustive-deps
