@@ -1,5 +1,8 @@
-import type { Chapter, Scene } from '../types';
-import { C, E, F, N, S } from '../dsl';
+import type { Chapter, DecisionRecord, Lesson, SEdge, SNode, Scene, Widget } from '../types';
+import { A, C, E, F, N, S } from '../dsl';
+import { bars, code, kv, pin, scener } from './pat_traffic';
+
+const dec5 = (o: Partial<DecisionRecord> & { context: string; decision: string; cto: string }): DecisionRecord => ({ options: [], consequences: [], ...o });
 
 // ── Inference: prefill, decode, KV cache, batching ──
 const REQ = N('req', 0, 3.2, { kind: 'crowd', label: 'incoming requests', w: 1.8, d: 1.6 });
@@ -52,6 +55,145 @@ const s9: Scene = S([...nodes, KV], [...E0, E('g-kv', 'gpu', 'kv', { both: true 
 const s10: Scene = S([...nodes, KV, DRAFT], [...E0, E('g-kv', 'gpu', 'kv', { both: true }), E('d-g', 'draft', 'gpu')], [F('r-s', 'req', 2), F('s-g', 'req', 2), F('h-g', 'msg', 1), F('g-kv', 'vec', 1), F('d-g', 'token', 1), F('g-o', 'token', 2.5, { text: ['tok'] })], {
   widgets: [{ type: 'code', id: 'r', x: 0, y: 0, w: 340, title: 'recap', lines: ['prefill: compute-bound → TTFT', 'decode:  memory-bound  → TPOT', 'KV cache: trade memory for no recompute', 'batching + paging: fill the GPU', 'quantize, speculate: fewer bytes per token'] }],
 });
+
+// ── Caching: prompt (prefix) cache + semantic cache (v3 pattern lesson; numbers illustrative) ──
+const K: Record<string, SNode> = {
+  ua: N('ua', 0, 0, { kind: 'crowd', label: 'Tenant A users', w: 1.5, d: 1.3 }),
+  ub: N('ub', 0, 9.2, { kind: 'crowd', label: 'Tenant B users', w: 1.5, d: 1.3 }),
+  gw: N('gw', 4.6, 4.6, { label: 'Gateway', glyph: 'route', tone: 'amber' }),
+  sc: A('sc', 9.2, 0, 'AmazonElastiCache', 'Semantic cache'),
+  m: A('m', 13.8, 4.6, 'AmazonBedrock', 'Model'),
+  pc: N('pc', 18.4, 4.6, { label: 'Prefix cache', glyph: 'cache', tone: 'pink' }),
+  docs: N('docs', 9.2, -4.6, { kind: 'doc', label: 'Policy docs', glyph: 'doc', tone: 'violet' }),
+};
+const KE: Record<string, SEdge> = {
+  'ua-gw': E('ua-gw', 'ua', 'gw'), 'ub-gw': E('ub-gw', 'ub', 'gw'), 'gw-sc': E('gw-sc', 'gw', 'sc', { both: true }), 'gw-m': E('gw-m', 'gw', 'm'),
+  'm-pc': E('m-pc', 'm', 'pc', { both: true, label: 'KV reuse' }), 'docs-sc': E('docs-sc', 'docs', 'sc', { dashed: true, label: 'purge on edit' }),
+};
+const kvs = scener(K, KE, 'caching');
+const kBase = ['ua', 'ub', 'gw', 'm'];
+const kBaseE = ['ua-gw', 'ub-gw', 'gw-m'];
+const kUsers = [F('ua-gw', 'req', 0.9, { text: ['Can I cancel my order?'] }), F('ub-gw', 'req', 0.9)];
+const kPrefix = [...kBase, 'pc'];
+const kPrefixE = [...kBaseE, 'm-pc'];
+const kAll = [...kPrefix, 'sc'];
+const kAllE = [...kPrefixE, 'gw-sc'];
+const kAllFlows = [...kUsers, F('gw-sc', 'res', 0.9, { reverse: true, text: ['hit'] }), F('gw-m', 'req', 0.6), F('m-pc', 'vec', 0.6)];
+const promptTokens: Widget = { type: 'tokens', id: 'kpt', x: 0, y: 0, w: 320, title: 'one request (illustrative)', items: [{ t: 'tools 2K', tone: 'teal' }, { t: 'system 1K', tone: 'violet' }, { t: 'policy docs 9K', tone: 'violet' }, { t: 'history', tone: 'slate', dim: true }, { t: 'question', tone: 'amber' }] };
+
+const cachingLesson: Lesson = {
+  id: 'caching-strategies', title: 'Caching for LLM Apps', minutes: 13, level: 'intermediate',
+  summary: 'Prompt (prefix) caching for static prompt parts and a semantic cache for repeated questions: where each saves money, and how each one bites.',
+  metrics: [{ id: 'cost', label: 'cost / 1k req', icon: 'chart', good: 'low' }, { id: 'lat', label: 'p50 latency', icon: 'clock', good: 'low' }, { id: 'bad', label: 'wrong or leaked', icon: 'x', good: 'low' }],
+  legend: ['req', 'res', 'vec', 'fail'],
+  goals: [{ text: 'Prompt caching: exact prefix reuse', step: 2 }, { text: 'Semantic cache and tenant-scoped keys', step: 4 }, { text: 'False hits, leaks, TTL and invalidation', step: 6 }],
+  steps: [
+    { short: 'Setup', tag: 'setup', title: 'Same prefix, similar questions, all day', metrics: { cost: '$42', lat: '1.8 s', bad: '0' },
+      scene: kvs(kBase, kBaseE, [...kUsers, F('gw-m', 'req', 1.4)], { widgets: [promptTokens] }),
+      body: ['A support assistant serves two tenants. Every request carries the same 12K-token prefix: tools, system prompt and policy documents. Many questions repeat with small wording changes. All prices here are illustrative.'] },
+    { short: 'Waste', tag: 'problem', title: 'Paying for the same 12K tokens every call', metrics: { cost: '$42', lat: '1.8 s', bad: '0' },
+      scene: kvs(kBase, kBaseE, [...kUsers, F('gw-m', 'req', 1.6, { text: ['12K prefix + question'] })], { patch: { m: { state: 'hot', ...pin('12K tokens, again', 'amber', 'loop') } },
+        widgets: [bars('input tokens per request', [{ label: 'prefix', value: 12000, tone: 'red', hi: true }, { label: 'question', value: 400, tone: 'green' }])] }),
+      body: ['More than 95% of each request\'s input is identical to the previous one, yet the model runs prefill over all of it and bills every token. Latency to first token grows with the prefix too.'] },
+    { short: 'Prefix', tag: 'solution', title: 'Prompt caching reuses the static prefix', metrics: { cost: '$19', lat: '1.1 s', bad: '0' },
+      scene: kvs(kPrefix, kPrefixE, [...kUsers, F('gw-m', 'req', 1.4), F('m-pc', 'vec', 1)], { patch: { pc: pin('cache read 12K', 'green', 'check') },
+        widgets: [kv('Bedrock prompt caching', [['checkpoint', 'after the static prefix'], ['order', 'tools → system → messages'], ['hit needs', 'an exact prefix match', 'amber'], ['TTL', '5 min, resets on hit (1 h on some models)'], ['billing', 'reads discounted, writes may cost more']], 330)] }),
+      body: ['<span class="term">Prompt caching</span> stores the model\'s computed state for a prefix you mark with a cache checkpoint. A later request with exactly the same prefix reads it at a discounted rate and starts faster. One timestamp at the top of the system prompt makes every prefix unique: zero hits.'] },
+    { short: 'Semantic', tag: 'solution', title: 'A semantic cache skips the model entirely', metrics: { cost: '$12', lat: '0.6 s', bad: '0' },
+      scene: kvs(kAll, kAllE, kAllFlows, { patch: { sc: pin('hit, similarity 0.97', 'green', 'check') } }),
+      body: ['A <span class="term">semantic cache</span> sits before the model. It embeds the question, searches stored questions, and above a similarity threshold returns the stored answer without any model call. ElastiCache for Valkey supports the vector search this needs.'] },
+    { short: 'Keys', tag: 'technique', title: 'The key is a namespace, then a vector', metrics: { cost: '$12', lat: '0.6 s', bad: '0' },
+      scene: kvs(kAll, kAllE, kAllFlows, { patch: { ua: pin('ns: tenant A', 'blue'), ub: pin('ns: tenant B', 'teal') },
+        widgets: [code('cache key', ['ns = tenant | model | prompt_v | locale | scope', 'hit = vector_search(ns, embed(q), k=1)', 'if hit.score >= 0.95 and intent_is_cacheable(q):', '    return hit.answer', 'store(ns, q, answer, source_doc_ids, created_at)'])] }),
+      body: ['The namespace pins tenant, model, prompt version, locale and permission scope; similarity search runs only inside it. Store the source document IDs with each answer, so a document change can find and purge every answer built on it.'] },
+    { short: 'False hit', tag: 'tradeoff', title: 'Similar is not the same question', metrics: { cost: '$12', lat: '0.6 s', bad: '0' },
+      scene: kvs(kAll, kAllE, kAllFlows, { patch: { sc: pin('hit, similarity 0.97', 'green', 'check') } }),
+      inject: { label: 'near-duplicate question', metrics: { bad: '1 in 40 hits' },
+        note: '"Can I cancel after it shipped?" scores 0.95 against "Can I cancel my order?". The cache returns "Yes, cancel anytime", which is wrong for shipped orders. Similarity measures topic, not meaning.',
+        scene: kvs(kAll, kAllE, [F('ua-gw', 'req', 0.9, { text: ['Cancel after it shipped?'] }), F('gw-sc', 'fail', 0.8, { reverse: true, text: ['"Yes, anytime"'] }), F('gw-m', 'req', 0.2)], {
+          patch: { sc: { state: 'warn', ...pin('0.95: false hit', 'red', 'x') }, ua: pin('wrong answer', 'red') } }) },
+      body: ['Tune the threshold on labelled pairs of near-duplicates, not on hit rate. Cache only intents classified as safe, such as FAQs, and bypass questions with negations, dates, amounts or account details. Sample hits for review every week.'] },
+    { short: 'Leak', tag: 'tradeoff', title: 'A missing tenant key is a data breach', metrics: { cost: '$12', lat: '0.6 s', bad: '0' },
+      scene: kvs(kAll, kAllE, kAllFlows, { patch: { ua: pin('ns: tenant A', 'blue'), ub: pin('ns: tenant B', 'teal') } }),
+      inject: { label: 'tenant missing from key', metrics: { bad: 'tenant A data leaked' },
+        note: 'A refactor drops the tenant from the key. Tenant B asks what tenant A asked yesterday and receives A\'s answer, including A\'s contract terms. A false hit is a quality bug; this is a breach.',
+        scene: kvs(kAll, kAllE, [F('ub-gw', 'req', 0.9, { text: ['What is my notice period?'] }), F('gw-sc', 'attack', 0.8, { reverse: true, text: ['tenant A terms'] })], {
+          patch: { sc: { state: 'down', ...pin('no tenant in key', 'red', 'x') }, ub: { state: 'warn', ...pin('sees tenant A data', 'red', 'eye') } } }) },
+      body: ['Make the tenant part of the index name or a filter the cache client always adds, so no caller can forget it. Test it in CI: the same question from two tenants must produce two misses.'] },
+    { short: 'TTL', tag: 'technique', title: 'TTL and invalidation', metrics: { cost: '$13', lat: '0.6 s', bad: '0' },
+      scene: kvs([...kAll, 'docs'], [...kAllE, 'docs-sc'], [...kAllFlows, F('docs-sc', 'msg', 0.6, { text: ['refund policy v8'] })], { patch: { sc: pin('purged 214 answers', 'amber', 'loop') },
+        widgets: [kv('freshness rules (illustrative)', [['prices', 'TTL 1 h'], ['policies', 'TTL 24 h + purge on edit'], ['FAQ', 'TTL 7 d'], ['prompt version bump', 'new namespace'], ['prefix cache', 'edit tools/system: later parts miss', 'amber']], 320)] }),
+      body: ['Every cached answer needs a TTL that matches how fast its source changes, plus event-driven purge: when a policy document is edited, delete every answer that cites it. A new prompt version gets a new namespace, so old answers simply age out.'] },
+    { short: 'When not', tag: 'insight', title: 'When not to cache', metrics: { cost: '$42', lat: '1.8 s', bad: '0' },
+      scene: kvs(kBase, kBaseE, [...kUsers, F('gw-m', 'req', 1)], { patch: { gw: pin('bypass: account data', 'slate') } }),
+      body: ['No semantic cache for personalised answers, live data such as order status or balances, or anything that triggers an action. Prompt caching does not help prefixes below the model\'s minimum (512 to 4,096 tokens per checkpoint) or traffic too sparse to hit within the TTL, and batch inference does not support it.'] },
+    { short: 'On AWS', tag: 'aws', title: 'AWS mapping and open-source options', metrics: { cost: '$13', lat: '0.6 s', bad: '0' },
+      scene: kvs([...kAll, 'docs'], [...kAllE, 'docs-sc'], kAllFlows, {
+        widgets: [kv('building blocks', [['prefix cache', 'Bedrock prompt caching'], ['semantic cache', 'ElastiCache for Valkey vector search'], ['embeddings', 'Bedrock embedding models'], ['self-hosted prefix', 'vLLM automatic prefix caching'], ['open source', 'GPTCache, RedisVL SemanticCache']], 330)] }),
+      body: ['Bedrock prompt caching for static prefixes; ElastiCache for Valkey with vector search for the semantic cache, with embeddings from a Bedrock model. Self-hosted, vLLM\'s automatic prefix caching does the prefix part; GPTCache and RedisVL implement semantic caches.'] },
+    { short: 'Recap', tag: 'recap', title: 'Recap', metrics: { cost: '$13', lat: '0.6 s', bad: '0' },
+      scene: kvs([...kAll, 'docs'], [...kAllE, 'docs-sc'], kAllFlows, { patch: { sc: pin('tenant-scoped, TTL', 'green', 'check'), pc: pin('stable prefix', 'green') } }),
+      body: ['Keep prefixes stable and cache them at the provider. Put a semantic cache only in front of safe, repeated intents, keyed by tenant, model and prompt version, with TTLs and purge on source change. Measure false hits, not just hit rate.'] },
+  ],
+  pattern: {
+    family: 'traffic',
+    problem: 'The same prefix and the same questions are paid for on every call.',
+    solution: 'Provider prefix caching for static prompt parts; a tenant-scoped semantic cache for repeated questions.',
+    failure: 'Near-duplicate questions get wrong cached answers; a missing tenant key leaks data.',
+    whenNot: 'Personalised, live-data or action-taking requests; low repeat rates; tiny prompts.',
+    aws: ['Bedrock prompt caching', 'ElastiCache for Valkey vector search', 'Bedrock embedding models'],
+    oss: ['vLLM prefix caching', 'GPTCache', 'RedisVL'],
+    related: ['inference-kv-cache', 'cost-control', 'model-router-cascade', 'llm-gateway-observability'],
+  },
+  senior: dec5({
+    context: 'A support assistant resends a 12K-token prefix per call; the team also wants a semantic cache to cut spend further.',
+    options: [{ name: 'Prompt caching only', verdict: 'Safe, large saving, no correctness risk.' }, { name: 'Semantic cache for everything', verdict: 'Biggest saving, real risk of wrong or leaked answers.' }, { name: 'Prompt caching + semantic cache on safe intents', verdict: 'Most of both savings with bounded risk.' }],
+    decision: 'Ship prompt caching now; add a semantic cache only for classified FAQ intents, namespaced by tenant and prompt version, with a CI leak test and weekly false-hit sampling.',
+    consequences: ['Prompt layout becomes a reviewed contract', 'An intent classifier is now on the request path', 'False-hit rate is an owned metric'],
+    cto: 'We cache what is identical everywhere and what is genuinely the same question, and we can prove no tenant ever sees another tenant\'s answer.',
+  }),
+  quiz: [
+    { q: 'Why does a timestamp at the top of the system prompt hurt?', options: ['It confuses the model', 'It changes the prefix on every call, so prompt caching never hits', 'It adds many tokens', 'It breaks the semantic cache'], answer: 1, why: 'Prompt caching needs an exact prefix match.' },
+    { q: 'What is the main risk of a semantic cache?', options: ['Higher latency', 'Returning a stored answer for a question that is similar but different', 'Using too much memory', 'Breaking prompt caching'], answer: 1, why: 'Similarity captures topic, not exact meaning.' },
+    { q: 'What must every semantic cache key include in a multi-tenant system?', options: ['The user\'s IP', 'The tenant, plus model and prompt version', 'Only the question text', 'A timestamp'], answer: 1, why: 'Without the tenant, one customer can receive another\'s answer.' },
+  ],
+  scenario: {
+    title: 'Hit rate 40%, complaints up',
+    situation: 'A semantic cache reached a 40% hit rate. Support tickets about wrong refund answers doubled in the same month.',
+    options: [
+      { text: 'Raise the threshold until complaints stop.', outcome: 'Fewer hits, fewer errors, but nobody knows which intents were wrong.', grade: 'ok' },
+      { text: 'Sample hits, label false ones, restrict caching to safe intents and purge answers when the refund policy changes.', outcome: 'Hit rate settles near 25%; refund complaints return to baseline.', grade: 'best' },
+      { text: 'Lower the threshold to raise hit rate further.', outcome: 'More savings, more wrong answers.', grade: 'poor' },
+    ],
+  },
+  notes: {
+    key: [
+      '<b>Prompt caching</b> (provider-side): reuse computed state for an identical prompt prefix; discounted cached input and faster first token. On Bedrock you mark cache checkpoints; TTL is 5 minutes on many models (1 hour on some), reset on each hit.',
+      '<b>Exact response caching</b>: same request, same stored response. Safe for deterministic, non-personalised queries.',
+      '<b>Semantic caching</b>: embed the query and return a cached answer for a near-duplicate. High hit rates, with a risk of wrong answers for subtly different questions.',
+      'Cache keys must include tenant, model, prompt version and permission scope; vector search runs inside that namespace.',
+    ],
+    practices: [
+      'Order prompts: tools → system → static documents → conversation → latest question, so the prefix is stable.',
+      'Scope caches by tenant and permissions; include model and prompt version in cache keys.',
+      'Use a high similarity threshold for semantic caches and evaluate false hits on a labelled set.',
+      'Purge cached answers by source document ID when a document changes.',
+    ],
+    pitfalls: [
+      'A timestamp or request ID at the top of the system prompt breaks every prefix cache hit.',
+      'Semantic cache leaking one tenant\'s or user\'s personalised answer to another.',
+      'Optimising hit rate instead of correct-hit rate.',
+    ],
+    fde: ['Before proposing a semantic cache, pull a week of real questions and count true repeats; the number is often lower than expected.'],
+    refs: [
+      { t: 'Amazon Bedrock: Prompt caching', u: 'https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-caching.html' },
+      { t: 'Anthropic: Prompt caching', u: 'https://docs.claude.com/en/docs/build-with-claude/prompt-caching' },
+      { t: 'Amazon ElastiCache: Semantic caching with Valkey', u: 'https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/semantic-caching.html' },
+      { t: 'AWS: Vector search for Amazon ElastiCache', u: 'https://aws.amazon.com/about-aws/whats-new/2025/10/amazon-elasticache-vector-search/' },
+      { t: 'GPTCache', u: 'https://github.com/zilliztech/GPTCache' },
+    ],
+  },
+};
 
 export const ch05: Chapter = {
   id: 'inference', num: '05', title: 'Inference & Serving', tone: 'green',
@@ -135,6 +277,11 @@ export const ch05: Chapter = {
     {
       id: 'gpu-napkin-math', title: 'GPU Napkin Math', minutes: 7, level: 'intermediate',
       summary: 'Will it fit? How fast will it be? Back-of-the-envelope sizing for self-hosted LLMs.',
+      quiz: [
+        { q: 'Roughly how much memory do the weights of a 70B model need in fp16?', options: ['35 GB', '70 GB', '140 GB', '280 GB'], answer: 2, why: '70 billion parameters × 2 bytes each.' },
+        { q: 'A model fits at batch 1 but runs out of memory with 20 long-context users. What was forgotten?', options: ['The tokenizer', 'The KV cache', 'The LM head', 'Quantization'], answer: 1, why: 'KV cache grows with tokens in flight across all concurrent sequences.' },
+        { q: 'What bounds single-stream decode speed?', options: ['FLOPs', 'Memory bandwidth ÷ model bytes', 'Network latency', 'Vocabulary size'], answer: 1, why: 'Every decoded token reads all weights from memory.' },
+      ],
       notes: {
         key: [
           'Weights memory ≈ parameters × bytes/param (fp16: 2, fp8/int8: 1, int4: 0.5). 70B fp16 ≈ 140 GB → needs multiple 80 GB GPUs (tensor parallelism).',
@@ -156,29 +303,6 @@ export const ch05: Chapter = {
         ],
       },
     },
-    {
-      id: 'caching-strategies', title: 'Caching for LLM Apps', minutes: 6, level: 'intermediate',
-      summary: 'Prompt (prefix) caching, response caching and semantic caching: where each one saves money and where it bites.',
-      notes: {
-        key: [
-          '<b>Prompt caching</b> (provider-side): reuse computed KV for an identical prompt prefix; large discounts on cached input and faster TTFT. Available on Anthropic, OpenAI, Bedrock (for supported models) and others, each with its own rules and TTLs.',
-          '<b>Exact response caching</b>: same request → same stored response. Safe for deterministic, non-personalised queries.',
-          '<b>Semantic caching</b>: embed the query and return a cached answer for a near-duplicate. High hit rates, but a risk of returning a wrong answer for a subtly different question.',
-        ],
-        practices: [
-          'Order prompts: tools → system → static documents → conversation → latest question, so the prefix is stable.',
-          'Scope caches by tenant and permissions; include model and prompt version in cache keys.',
-          'Use a high similarity threshold for semantic caches and evaluate false hits on a labelled set.',
-        ],
-        pitfalls: [
-          'A timestamp or request ID at the top of the system prompt breaks every prefix cache hit.',
-          'Semantic cache leaking one user\'s personalised answer to another.',
-        ],
-        refs: [
-          { t: 'Anthropic: Prompt caching', u: 'https://docs.claude.com/en/docs/build-with-claude/prompt-caching' },
-          { t: 'Amazon Bedrock: Prompt caching', u: 'https://docs.aws.amazon.com/bedrock/latest/userguide/prompt-caching.html' },
-        ],
-      },
-    },
+    cachingLesson,
   ],
 };
