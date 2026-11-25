@@ -31,8 +31,7 @@ const c1s2 = S(asisAll, Object.values(aE), [F('mp', 'req', 0.5), F('mi', 'msg', 
   widgets: [{ type: 'kv', id: 'land', x: 0, y: 0, title: 'the as-is landscape', rows: [['channels', 'phone, email, agents'], ['systems of record', 'mainframe policy admin, claims app, ERP'], ['pricing', 'Excel sheets per state'], ['field work', 'independent appraisers, body shops']] }] });
 const c1s3 = S(asisAll.map(n => (n.id === 'handler' ? { ...n, state: 'hot' as const, badge: '23 touches' } : n)), Object.values(aE), [F('hc', 'msg', 1.1), F('hp', 'msg', 1.1), F('he', 'msg', 1.1), F('hx', 'msg', 0.8)], {
   widgets: [{ type: 'bars', id: 'tch', x: 0, y: 0, w: 300, title: 'handler touches per claim (illustrative)', items: [{ label: 're-keying', value: 9, tone: 'red', hi: true }, { label: 'chasing docs', value: 6, tone: 'amber' }, { label: 'appraiser calls', value: 4, tone: 'amber' }, { label: 'decisions', value: 4, tone: 'green' }] }] });
-const c1s4 = S(asisAll.map(n => (n.id === 'appr' ? { ...n, state: 'warn' as const } : n.id === 'handler' ? { ...n, pin: { text: 'downloads, renames, re-uploads', tone: 'amber' as const, icon: 'loop' as const } } : n)), Object.values(aE), [F('ha', 'msg', 0.9, { text: ['photos', 'estimate.pdf', 'call me?'] }), F('as', 'msg', 0.6), F('mi', 'msg', 0.7)], {
-  chips: [C('wa', 9.2, 9.2, 'evidence on personal phones', { tone: 'red', icon: 'x', z: 2 })],
+const c1s4 = S(asisAll.map(n => (n.id === 'appr' ? { ...n, state: 'warn' as const, pin: { text: 'evidence on personal phones', tone: 'red' as const, icon: 'x' as const } } : n.id === 'handler' ? { ...n, pin: { text: 'downloads, renames, re-uploads', tone: 'amber' as const, icon: 'loop' as const } } : n)), Object.values(aE), [F('ha', 'msg', 0.9, { text: ['photos', 'estimate.pdf', 'call me?'] }), F('as', 'msg', 0.6), F('mi', 'msg', 0.7)], {
   widgets: [{ type: 'kv', id: 'audit', x: 0, y: 0, title: 'what goes wrong', rows: [['photos', 'in personal WhatsApp threads', 'red'], ['estimates', 'PDF attachments, re-typed', 'red'], ['audit trail', 'incomplete', 'red'], ['follow-ups', 'manual reminders', 'amber']] }] });
 const c1s5 = S(asisAll.map(n => (n.id === 'xls' ? { ...n, state: 'warn' as const, badge: 'v17_final(2).xlsx' } : n)), Object.values(aE), [F('hx', 'msg', 0.8)], {
   widgets: [{ type: 'kv', id: 'px', x: 0, y: 0, title: 'pricing in spreadsheets', rows: [['labor rates', 'per state, per shop tier'], ['parts', 'OEM vs aftermarket rules'], ['versions', 'emailed around', 'red'], ['effect', 'inconsistent payments (leakage)', 'red']] }] });
@@ -118,7 +117,7 @@ const W: Record<string, SNode> = {
   claims: N('claims', 31.74, 4.6, { kind: 'cyl', label: 'Claims system', glyph: 'db', tone: 'slate' }),
   erp: N('erp', 31.74, 9.2, { kind: 'cyl', label: 'ERP (payments)', glyph: 'db', tone: 'slate' }),
   pricing: A('pricing', 21.16, 9.2, 'AmazonDynamoDB', 'Pricing tables'),
-  a2i: N('a2i', 10.58, 9.2, { label: 'Adjuster workbench', glyph: 'user', tone: 'blue' }),
+  a2i: N('a2i', 10.58, 9.2, { label: 'Workbench', glyph: 'user', tone: 'blue' }),
   adj: N('adj', 10.58, 13.8, { kind: 'crowd', label: 'Adjusters', w: 1.6, d: 1.4 }),
   appr: N('appr', 0, 13.8, { kind: 'crowd', label: 'Appraisers', w: 1.6, d: 1.4 }),
   eb: A('eb', 5.29, 9.2, 'AmazonEventBridge', 'Claim events'),

@@ -182,7 +182,7 @@ export function LessonView({ chapter, lesson, stepParam, next, onMark }:
                 <h2 className="sc-title">{step.title}</h2>
                 {injected && <div className="callout callout-warn inj-note"><span className="ci"><Icon g="bolt" size={15} /></span><div><b className="ct">Broken: {step.inject!.label}</b><span dangerouslySetInnerHTML={{ __html: step.inject!.note }} /></div></div>}
                 <div className="sc-body">{step.body.map((b, i) => <p key={i} dangerouslySetInnerHTML={{ __html: b }} />)}</div>
-                {(step.scene.widgets ?? []).length > 0 && <Widgets widgets={step.scene.widgets!} epoch={epoch} panel />}
+                {(() => { const w = (injected && step.inject!.scene.widgets?.length ? step.inject!.scene.widgets : step.scene.widgets) ?? []; return w.length > 0 && <Widgets key={injected ? 'inj' : 'base'} widgets={w} epoch={epoch} panel />; })()}
                 {step.callout && (
                   <div className={`callout callout-${step.callout.kind}`}>
                     <span className="ci"><Icon g={CALLOUT[step.callout.kind][1]} size={15} /></span>

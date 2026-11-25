@@ -37,7 +37,7 @@ const s6: Scene = S(pipe.map(n => (n.id === 'llm' ? { ...n, badge: '×2.6' } : n
   widgets: [{ type: 'bars', id: 'tax', x: 0, y: 0, w: 320, title: 'same sentence, tokens per language (illustrative)', items: [{ label: 'English', value: 12, tone: 'green' }, { label: 'French', value: 16, tone: 'amber' }, { label: 'Arabic', value: 31, tone: 'red', hi: true }, { label: 'Darija', value: 34, tone: 'red' }] },
     { type: 'kv', id: 'k', x: 0, y: 0, w: 230, title: 'more tokens means…', rows: [['cost', 'higher', 'red'], ['latency', 'higher', 'red'], ['context room', 'lower', 'red']] }],
 });
-const s7: Scene = S(pipe, pipeE, pipeF(), {
+const s7: Scene = S(pipe.map(n => (n.id === BPE.id ? { ...n, pin: { text: 'special tokens are IDs too', tone: 'violet' as const, icon: 'hash' as const } } : n)), pipeE, pipeF(), {
   widgets: [{ type: 'code', id: 'tpl', x: 0, y: 0, w: 330, title: 'a chat template (generic, illustrative)', lines: ['<|begin|><|system|>', 'You are a claims assistant.<|end|>', '<|user|>', 'Status of claim 42?<|end|>', '<|assistant|>', '// model continues from here…'] }],
   chips: [C('sp', 10.2, 3, 'special tokens are just IDs too', { tone: 'violet', icon: 'hash', z: 1.2 })],
 });

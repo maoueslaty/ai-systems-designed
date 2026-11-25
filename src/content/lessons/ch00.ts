@@ -29,7 +29,7 @@ const ragEdges = [E('u-p', 'users', 'app'), E('p-o', 'app', 'orch'), E('o-l', 'o
   E('o-v', 'orch', 'vec', { label: 'search', labelAt: 0.4 }), E('d-v', 'docs', 'vec', { label: 'embed', dashed: true, labelAt: 0.4 })];
 const ragFlows = [F('u-p', 'req', 1.2), F('p-o', 'req', 1.2), F('o-v', 'vec', 1.2), F('o-v', 'ctx', 1.2, { reverse: true }),
   F('o-l', 'ctx', 1.2), F('o-l', 'token', 1.4, { reverse: true, text: ['Per', 'policy', '§4.2', '…'] }), F('d-v', 'vec', 0.6)];
-const s3: Scene = S(ragNodes, ragEdges, ragFlows, { chips: [C('grounded', 12, 3.4, 'grounded + cited', { tone: 'green', icon: 'check' })] });
+const s3: Scene = S(ragNodes.map(n => (n.id === 'llm' ? { ...n, pin: { text: 'grounded + cited', tone: 'green' as const, icon: 'check' as const } } : n)), ragEdges, ragFlows);
 
 const toolNodes = [...ragNodes, T, X];
 const toolEdges = [...ragEdges, E('o-t', 'orch', 'tools', { label: 'tool call' }), E('t-x', 'tools', 'sor')];
@@ -55,13 +55,12 @@ const s7: Scene = S([...fullNodes, OB], obsEdges, obsFlows, {
   widgets: [{ type: 'kv', id: 'eval', x: 2, y: 4, w: 220, title: 'eval run #128', rows: [['faithfulness', '0.94', 'green'], ['answer relevance', '0.91', 'green'], ['tool-arg validity', '0.99', 'green'], ['p95 latency', '3.8 s', 'amber'], ['cost / task', '$0.021']] }],
 });
 
-const s8: Scene = S([...fullNodes, OB], obsEdges, obsFlows, {
+const s8: Scene = S([...fullNodes, { ...OB, pin: { text: 'Ch 11–12: evals and ops', tone: 'green' as const } }], obsEdges, obsFlows, {
   chips: [
     C('c1', 16, 3.2, 'Ch 01–05: the model', { tone: 'pink', z: 2.2 }),
     C('c2', 8, -1.6, 'Ch 02 and 07: retrieval', { tone: 'violet', z: 1.9 }),
     C('c3', 12, -1.6, 'Ch 08–09: tools and MCP', { tone: 'teal', z: 2.1 }),
     C('c4', 8, 3.4, 'Ch 10: agents', { tone: 'cyan', z: 1.9 }),
-    C('c5', 8, 10.4, 'Ch 11–12: evals and ops', { tone: 'green', z: 1 }),
     C('c6', 4, 8, 'Ch 13: security', { tone: 'red', z: 1.6 }),
   ],
 });

@@ -379,7 +379,8 @@ kbd { font: 500 11px var(--mono); border: 1px solid var(--line-2); border-bottom
 .widgets.in-panel { flex-direction: column; flex-wrap: nowrap; overflow: visible; gap: 10px; margin: 2px 0 12px; padding: 0; }
 .widgets.in-panel .widget { width: 100%; background: var(--bg-2); border-color: var(--line); }
 .widgets.in-panel .w-code pre { font-size: 11.5px; }
-.widgets.in-panel .bar-row { grid-template-columns: 78px 1fr 48px; }
+.widgets.in-panel .bar-row { grid-template-columns: minmax(78px, max-content) 1fr 48px; }
+.widgets.in-panel .bar-l { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .widgets.in-panel .w-matrix { overflow-x: auto; }
 .widgets.in-panel .w-matrix td { width: 28px; }
 .w-matrix th.vh { vertical-align: bottom; height: 56px; padding: 0 0 4px; }
