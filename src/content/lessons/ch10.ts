@@ -1,4 +1,4 @@
-import type { Chapter, Scene } from '../types';
+import type { Chapter, Scene, SEdge, SFlow, SNode } from '../types';
 import { A, C, E, F, N, S } from '../dsl';
 
 // ── Workflows vs agents: the composable patterns ──
@@ -55,6 +55,57 @@ const s7 = agentScene({ widgets: [{ type: 'code', id: 'ag', x: 0, y: 0, title: '
 const s8 = agentScene({ widgets: [{ type: 'bars', id: 'cost', x: 0, y: 0, title: 'typical cost per task (relative, illustrative)', items: [{ label: 'single call', value: 1, tone: 'green' }, { label: 'workflow', value: 3, tone: 'amber' }, { label: 'agent', value: 15, tone: 'red', hi: true }, { label: 'multi-agent', value: 40, tone: 'red' }], unit: '×' }] });
 const s9 = agentScene({ chips: [C('ck', 0, 9.2, 'approve before refund', { tone: 'amber', icon: 'flag', z: 1.6 })], widgets: [{ type: 'kv', id: 'hitl', x: 0, y: 0, title: 'human-in-the-loop', rows: [['before', 'irreversible or costly actions'], ['when', 'confidence low / policy says so'], ['show', 'the plan and the exact action']] }] });
 const s10 = agentScene({ widgets: [{ type: 'kv', id: 'pick', x: 0, y: 0, title: 'choose the simplest that works', rows: [['fixed steps', 'prompt chain'], ['categories', 'routing'], ['independent parts', 'parallelization'], ['unknown subtasks', 'orchestrator-workers'], ['clear quality bar', 'evaluator-optimizer'], ['open-ended, tool-heavy', 'agent']] }] });
+
+// ── Multi-agent systems & A2A (animated) ──
+const MN: Record<string, SNode> = {
+  user: N('user', -1, 7, { kind: 'crowd', label: 'Claims lead', w: 1.4, d: 1.2 }),
+  one: N('one', 4, 6, { label: 'One agent, 60 tools', glyph: 'bot', tone: 'llm', w: 1.4, d: 1.4, h: 1 }),
+  sup: N('sup', 4, 6, { label: 'Supervisor', glyph: 'route', tone: 'cyan', w: 1.4, d: 1.4, h: 1 }),
+  st: N('st', 5, 13, { kind: 'cyl', label: 'Task state', glyph: 'layers', tone: 'teal' }),
+  r1: N('r1', 3, -1, { label: 'Policy agent', glyph: 'bot', tone: 'teal' }),
+  r2: N('r2', 10.5, 1.5, { label: 'Repair agent', glyph: 'bot', tone: 'teal' }),
+  r3: N('r3', 12, 8, { label: 'Payments agent', glyph: 'bot', tone: 'teal' }),
+  shop: N('shop', 16.5, -2.5, { label: 'Body-shop agent', glyph: 'bot', tone: 'pink' }),
+  card: N('card', 15, -9, { kind: 'doc', label: 'Agent Card', glyph: 'doc', tone: 'pink' }),
+};
+const ME: Record<string, SEdge> = {
+  'u-o': E('u-o', 'user', 'one'), 'u-s': E('u-s', 'user', 'sup'),
+  's-1': E('s-1', 'sup', 'r1', { both: true }), 's-2': E('s-2', 'sup', 'r2', { both: true }), 's-3': E('s-3', 'sup', 'r3', { both: true }),
+  's-st': E('s-st', 'sup', 'st', { both: true }), 'r3-st': E('r3-st', 'r3', 'st', { both: true }),
+  'r2-r3': E('r2-r3', 'r2', 'r3', { both: true }),
+  'r2-shop': E('r2-shop', 'r2', 'shop', { both: true, label: 'A2A' }), 'r2-card': E('r2-card', 'r2', 'card', { dashed: true }),
+};
+const M = (ids: string[], eids: string[], flows: SFlow[] = [], x: { patch?: Record<string, Partial<SNode>>; widgets?: Scene['widgets'] } = {}): Scene =>
+  S(ids.map(id => ({ ...MN[id], ...(x.patch?.[id] ?? {}) })), eids.map(id => ME[id]), flows, { widgets: x.widgets });
+const mTeam = ['user', 'sup', 'st', 'r1', 'r2', 'r3'];
+const mTeamE = ['u-s', 's-1', 's-2', 's-3', 's-st', 'r3-st'];
+const mFlows: SFlow[] = [F('u-s', 'req', 0.4), F('s-1', 'msg', 0.5, { text: ['brief'] }), F('s-2', 'msg', 0.5), F('s-3', 'msg', 0.4), F('s-1', 'res', 0.4, { reverse: true, text: ['findings'] }), F('s-st', 'ctx', 0.4)];
+const ma1 = M(['user', 'one'], ['u-o'], [F('u-o', 'req', 0.6, { text: ['claim C-7731: what do we owe?'] })], {
+  patch: { one: { pin: { text: 'context 40%', tone: 'cyan', icon: 'layers' } } },
+  widgets: [{ type: 'kv', id: 'job', x: 0, y: 0, title: 'one task, three domains (illustrative)', rows: [['policy', 'coverage, deductible, endorsements'], ['repair', 'estimate, shop quote, parts'], ['payment', 'who is paid, how much'], ['tools', '60 across all three']] }] });
+const ma2 = M(['user', 'one'], ['u-o'], [F('u-o', 'req', 0.6), F('u-o', 'fail', 0.4, { reverse: true, dropAt: 0.5 })], {
+  patch: { one: { state: 'hot', pin: { text: '92% full · wrong tool', tone: 'red', icon: 'x' } } } });
+const ma3 = M(mTeam, mTeamE, mFlows, { patch: { sup: { pin: { text: 'briefs, not transcript', tone: 'green', icon: 'check' } } } });
+const ma4 = M(mTeam, mTeamE, [F('s-3', 'msg', 0.6, { text: ['handoff v12'] }), F('r3-st', 'ctx', 0.6, { reverse: true, text: ['state://C-7731'] }), F('s-st', 'trace', 0.4)], {
+  patch: { st: { pin: { text: 'handoff stored', tone: 'teal', icon: 'check' } } },
+  widgets: [{ type: 'code', id: 'ho', x: 0, y: 0, title: 'a handoff is a contract', lines: ['handoff → payments_agent {', '  goal: "draft payment for claim C-7731",', '  facts: "state://C-7731/v12",', '  constraints: ["deductible 500 USD", "pay the shop"],', '  done_when: "payment draft id returned", hop: 1 }'] }] });
+const ma5 = M(mTeam, mTeamE, [F('s-3', 'msg', 0.6), F('r3-st', 'ctx', 0.5, { reverse: true })], {
+  patch: { r3: { pin: { text: 'deductible 500 ✓', tone: 'green', icon: 'check' } } } });
+const ma5i = M(mTeam, mTeamE, [F('s-3', 'msg', 0.6, { text: ['"pay the repair"'] }), F('r3-st', 'fail', 0.4, { dropAt: 0.5 })], {
+  patch: { sup: { pin: { text: 'paraphrased handoff', tone: 'amber', icon: 'x' } }, r3: { state: 'warn', pin: { text: 'drafts full 4,100', tone: 'red', icon: 'x' } } } });
+const ma6 = M(mTeam, [...mTeamE, 'r2-r3'], [F('r2-r3', 'msg', 0.6, { text: ['not mine'] }), F('s-2', 'res', 0.4, { reverse: true, text: ['hop limit'] })], {
+  patch: { r2: { pin: { text: 'hop 3/3 → supervisor', tone: 'amber', icon: 'flag' } } } });
+const ma6i = M(mTeam, [...mTeamE, 'r2-r3'], [F('r2-r3', 'msg', 1.6, { text: ['not mine', 'not mine'] })], {
+  patch: { r2: { state: 'hot', pin: { text: 'hop 9', tone: 'red', icon: 'loop' } }, r3: { state: 'hot', pin: { text: '60k tokens, no result', tone: 'red', icon: 'x' } } } });
+const ma7 = M([...mTeam, 'shop', 'card'], [...mTeamE, 'r2-shop', 'r2-card'], [F('r2-card', 'req', 0.4, { text: ['agent-card.json'] }), F('r2-shop', 'msg', 0.6, { text: ['quote repair'] }), F('r2-shop', 'res', 0.5, { reverse: true, text: ['input-required', 'artifact: quote'] })], {
+  patch: { shop: { pin: { text: 'other vendor\'s stack', tone: 'pink', icon: 'globe' } } },
+  widgets: [{ type: 'kv', id: 'a2a', x: 0, y: 0, title: 'A2A v1.0 in four nouns', rows: [['Agent Card', '/.well-known/agent-card.json'], ['task', 'submitted → working → completed'], ['interrupted', 'input-required, auth-required'], ['message / artifact', 'parts in, results out']] }] });
+const ma8 = M(['user', 'one'], ['u-o'], [F('u-o', 'req', 0.6), F('u-o', 'res', 0.5, { reverse: true })], {
+  patch: { one: { label: 'One agent, 12 tools', pin: { text: 'one shared context', tone: 'green', icon: 'check' } } } });
+const ma9 = M([...mTeam, 'shop', 'card'], [...mTeamE, 'r2-shop', 'r2-card'], [...mFlows, F('r2-shop', 'msg', 0.4)], {
+  widgets: [{ type: 'kv', id: 'aws', x: 0, y: 0, title: 'building blocks', rows: [['AgentCore Runtime', 'hosts agents; MCP and A2A'], ['Strands Agents', 'agents-as-tools, swarm, graph, A2A'], ['open source', 'A2A SDKs, LangGraph, OpenAI Agents SDK']] }] });
+const ma10 = M([...mTeam, 'shop', 'card'], [...mTeamE, 'r2-shop', 'r2-card'], mFlows, {
+  widgets: [{ type: 'code', id: 'rc', x: 0, y: 0, title: 'recap', lines: ['split by context, not by org chart', 'handoff = goal + constraints + state ref + done', 'one owner per task; cap hops', 'A2A for agents across vendors; MCP for tools', 'default: one agent with good tools'] }] });
 
 export const ch10: Chapter = {
   id: 'agents', num: '10', title: 'Agents', tone: 'llm',
@@ -128,25 +179,104 @@ export const ch10: Chapter = {
       },
     },
     {
-      id: 'multi-agent', title: 'Multi-Agent Systems & A2A', minutes: 7, level: 'advanced',
-      summary: 'When several agents beat one, how they coordinate, and the Agent2Agent protocol.',
+      id: 'multi-agent', title: 'Multi-Agent Systems & A2A', minutes: 12, level: 'advanced',
+      summary: 'When one context overflows: a supervisor and specialists with clean contexts, explicit handoffs with state, A2A across vendors, and when a single agent with good tools is still better.',
+      metrics: [{ id: 'ctx', label: 'peak context / agent', icon: 'layers', good: 'low' }, { id: 'tok', label: 'tokens per task (rel.)', icon: 'chart', good: 'low' }, { id: 'hops', label: 'handoffs per task', icon: 'route', good: 'low' }],
+      legend: ['req', 'res', 'msg', 'ctx', 'trace', 'fail'],
+      goals: [{ text: 'Why one context overflows', step: 1 }, { text: 'Supervisor, specialists, explicit handoffs', step: 2 }, { text: 'Context loss, ping-pong, A2A', step: 4 }],
+      steps: [
+        { short: 'One agent', tag: 'setup', title: 'One agent, three domains, 60 tools', scene: ma1, metrics: { ctx: '70k', tok: '1×', hops: 0 },
+          body: ['A claims lead asks what is owed on a claim. One agent handles policy, repair and payment with 60 tools. On simple claims this works.'] },
+        { short: 'Overflow', tag: 'problem', title: 'The context fills, tool choice degrades', scene: ma2, metrics: { ctx: '180k', tok: '2.5×', hops: 0 },
+          body: ['On a hard claim the context fills with policy PDFs, estimates and payment history. The agent picks the wrong tool three times and loses the deductible somewhere in the middle.'] },
+        { short: 'Specialists', tag: 'solution', title: 'Supervisor and specialists', scene: ma3, metrics: { ctx: '40k peak', tok: '~4×', hops: 3 },
+          changes: [{ sign: '~', text: 'One agent → supervisor' }, { sign: '+', text: 'Three specialists, task state' }],
+          compare: {
+            left: { label: 'One overloaded agent', scene: M(['user', 'one'], ['u-o'], [F('u-o', 'req', 0.6)], { patch: { one: { label: 'One agent', state: 'hot' } } }) },
+            right: { label: 'Supervisor + team', scene: M(['user', 'sup', 'r1', 'r2', 'r3'], ['u-s', 's-1', 's-2', 's-3'], [F('s-1', 'msg', 0.5), F('s-2', 'msg', 0.5), F('s-3', 'msg', 0.5)], { patch: { r1: { label: 'Policy' }, r2: { label: 'Repair' }, r3: { label: 'Payments' } } }) },
+          },
+          body: ['Split by context, not by org chart. A supervisor breaks the task down and hands each part to a specialist with a clean context and only its own tools.', 'Specialists return short findings; the supervisor never sees their raw working.'] },
+        { short: 'Handoff', tag: 'technique', title: 'A handoff is a contract, with state', scene: ma4, metrics: { ctx: '40k peak', tok: '~4×', hops: 3 },
+          body: ['Write the goal, the constraints, a reference to shared state and a definition of done. The receiver reads the state it needs instead of a paraphrase.', 'Every handoff is stored, so a crash or a person can pick up where it stopped.'] },
+        { short: 'Lost', tag: 'tradeoff', title: 'Context loss at the handoff', scene: ma5, metrics: { ctx: '40k peak', tok: '~4×', hops: 3 },
+          body: ['Each handoff is a lossy compression of what the sender knew. The payments agent only knows what it was told.', 'Pass structured fields and a state reference, and have the receiver reject a handoff missing a required field.'],
+          inject: { label: 'paraphrased handoff', metrics: { ctx: '40k peak', tok: '~4×', hops: 3 }, scene: ma5i,
+            note: 'The supervisor writes "pay the repair" instead of the structured handoff, and the 500 USD deductible falls out. The payments agent drafts the full amount. A required constraints field would have stopped it before money moved.' } },
+        { short: 'Ping-pong', tag: 'tradeoff', title: 'Ping-pong between specialists', scene: ma6, metrics: { ctx: '40k peak', tok: '~4×', hops: 3 },
+          body: ['Two specialists can each decide the task belongs to the other, and bill for every bounce.', 'Give each task one owner, count hops in the handoff, and send anything that hits the cap back to the supervisor or a person.'],
+          inject: { label: 'no hop limit', metrics: { ctx: '60k', tok: '~9×', hops: 9 }, scene: ma6i,
+            note: 'Repair says "payment question", payments says "estimate question". Nine hops and 60k tokens later nothing has happened. A hop counter would have stopped it at three.' } },
+        { short: 'A2A', tag: 'technique', title: 'A2A: agents across vendors', scene: ma7, metrics: { ctx: '40k peak', tok: '~4×', hops: 4 },
+          changes: [{ sign: '+', text: 'Partner agent and its Agent Card' }],
+          body: ['The body shop runs its own agent on another stack. With A2A v1.0 yours reads its <b>Agent Card</b>, sends a <b>message</b> that creates a <b>task</b>, and receives <b>artifacts</b>.', 'Tasks can pause in input-required. MCP connects agents to tools; A2A connects agents to agents.'] },
+        { short: 'When not', tag: 'insight', title: 'When one agent with good tools is better', scene: ma8, metrics: { ctx: '30k', tok: '1×', hops: 0 },
+          body: ['Anthropic reported multi-agent research using about 15× the tokens of a chat. That pays for broad, parallel work.', 'For tightly coupled tasks (most coding, one negotiation) splitting loses shared context. First try one agent with fewer, better tools and context management.'] },
+        { short: 'AWS', tag: 'aws', title: 'On AWS and in open source', scene: ma9, metrics: { ctx: '40k peak', tok: '~4×', hops: 3 },
+          body: ['<b>AgentCore Runtime</b> hosts agents and supports both MCP and A2A. <b>Strands Agents</b> offers agents-as-tools, swarms, graphs and A2A.', 'Open source: the A2A SDKs, LangGraph, OpenAI Agents SDK handoffs.'] },
+        { short: 'Recap', tag: 'recap', title: 'Multi-agent, end to end', scene: ma10, metrics: { ctx: '40k peak', tok: '~4×', hops: 3 },
+          body: ['Split only when context or parallelism demands it, hand off contracts not chat, cap hops, use A2A across vendors, and default to one agent with good tools.'] },
+      ],
+      pattern: {
+        family: 'orchestration',
+        problem: 'One agent\'s context overflows across domains and its tool choice degrades.',
+        solution: 'Supervisor delegates to specialists with clean contexts through structured, stored handoffs.',
+        failure: 'Context lost at handoffs, and specialists ping-ponging tasks.',
+        whenNot: 'Tightly coupled tasks where one agent with good tools keeps shared context.',
+        aws: ['AgentCore Runtime (MCP, A2A)', 'Strands Agents', 'Amazon Bedrock', 'DynamoDB (task state)'],
+        oss: ['A2A SDKs', 'LangGraph', 'OpenAI Agents SDK', 'CrewAI'],
+        related: ['workflows-vs-agents', 'durable-agent-execution', 'mcp-end-to-end', 'agent-evals'],
+      },
+      senior: {
+        context: 'A claims agent with 60 tools fails on complex claims. The team proposes eight agents.',
+        options: [
+          { name: 'Eight agents, one per department', verdict: 'Mirrors the org chart; many handoffs, high token cost.' },
+          { name: 'One agent, fewer and better tools', verdict: 'Cheapest; may still overflow on hard claims.' },
+          { name: 'Supervisor + three specialists for hard claims', verdict: 'Clean contexts where needed; simple claims stay single-agent.' },
+        ],
+        decision: 'Route simple claims to one agent with a trimmed tool set; send complex claims to a supervisor with three specialists, structured handoffs and a hop cap of three.',
+        consequences: ['Hard-claim accuracy improves where context was the bottleneck', 'Token cost rises only on the claims that need it', 'Handoff schemas become versioned contracts'],
+        cto: 'We use a team of agents only on the claims that overflow one agent, and every handoff is a contract we can inspect.',
+      },
+      quiz: [
+        { q: 'What is the main reason to split work across specialist agents?', options: ['Agents are cheaper', 'Clean, smaller contexts for broad or parallel work', 'It is the default in every framework', 'To mirror the org chart'], answer: 1, why: 'Specialists avoid one overloaded context.' },
+        { q: 'How do you prevent context loss at a handoff?', options: ['Longer prompts', 'Structured fields, a state reference, and a receiver that validates required fields', 'A larger model', 'More agents'], answer: 1, why: 'Paraphrases drop constraints; contracts do not.' },
+        { q: 'In A2A, where does an agent describe its skills and endpoint?', options: ['In a tool description', 'In its Agent Card', 'In the system prompt', 'In an MCP resource'], answer: 1, why: 'Agent Cards are published for discovery, typically at /.well-known/agent-card.json.' },
+      ],
+      scenario: {
+        title: 'The partner wants direct tool access',
+        situation: 'A body-shop partner asks for MCP access to your claims tools so their agent can read estimates.',
+        options: [
+          { text: 'Give their agent your MCP endpoint with a shared key.', outcome: 'They see every tool you expose, with no per-claim limits.', grade: 'poor' },
+          { text: 'Expose a narrow A2A agent with an Agent Card and skills for estimate exchange; your agent decides what to share per task.', outcome: 'A contract between agents; your tools stay internal.', grade: 'best' },
+          { text: 'Exchange estimates by email.', outcome: 'Safe and slow; the agents never talk.', grade: 'ok' },
+        ],
+      },
       notes: {
         key: [
-          'Common shapes: supervisor (lead agent delegates to sub-agents), pipeline, and peer-to-peer collaboration.',
+          'Common shapes: supervisor with specialists, pipeline, and peer handoffs.',
           'Sub-agents get their own clean context windows, which helps breadth-first research and large tasks.',
-          'The <b>Agent2Agent (A2A)</b> protocol standardises agent-to-agent communication (agent cards, tasks, messages); MCP connects agents to tools. AgentCore Runtime supports both MCP and A2A.',
+          'The <b>Agent2Agent (A2A)</b> protocol v1.0 standardises agent-to-agent communication (Agent Cards, tasks, messages, artifacts); MCP connects agents to tools. AgentCore Runtime supports both.',
+          'Multi-agent systems cost several times more tokens than single agents; Anthropic reported about 15× a chat for its research system.',
         ],
         practices: [
           'Give each sub-agent a precise brief: objective, output format, tools allowed, effort budget.',
-          'Have sub-agents write results to shared storage and return references, to save context.',
+          'Have sub-agents write results to shared state and return references, to save context.',
+          'Version handoff schemas; validate required fields on receipt.',
+          'Cap hops per task and give every task one owner.',
           'Start with one agent; split only when context limits or parallelism justify it.',
         ],
         pitfalls: [
           'Duplicate work and contradictory results without clear task boundaries.',
+          'Paraphrased handoffs that drop constraints.',
+          'Ping-pong between agents with no hop limit.',
           'Token costs scaling with the number of agents.',
         ],
+        fde: ['When a customer asks for "a team of agents", ask which part of the task overflows one context. If nothing does, propose one agent with better tools.'],
         refs: [
           { t: 'A2A protocol', u: 'https://a2a-protocol.org/' },
+          { t: 'A2A v1.0 builder\'s guide (AAIF)', u: 'https://aaif.io/blog/a2a-v1-0-a-builder-s-guide-part-1-discovery-tasks-and-clients' },
+          { t: 'Anthropic: How we built our multi-agent research system', u: 'https://www.anthropic.com/engineering/multi-agent-research-system' },
+          { t: 'Strands Agents 1.0: multi-agent orchestration', u: 'https://aws.amazon.com/blogs/opensource/introducing-strands-agents-1-0-production-ready-multi-agent-orchestration-made-simple' },
           { t: 'AgentCore Runtime: MCP and A2A', u: 'https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agents-tools-runtime.html' },
         ],
       },
@@ -154,6 +284,11 @@ export const ch10: Chapter = {
     {
       id: 'computer-use-agents', title: 'Browser & Computer-Use Agents', minutes: 6, level: 'advanced',
       summary: 'Agents that operate GUIs: when they make sense, how they fail, and how to contain them.',
+      quiz: [
+        { q: 'When is a computer-use agent the right choice?', options: ['Whenever an API exists', 'When the task needs a GUI and no API exists', 'For high-volume batch jobs', 'For latency-critical chat'], answer: 1, why: 'GUI automation is slower and less reliable than APIs, so use it only where no API exists.' },
+        { q: 'What is the dominant security risk for browser agents?', options: ['Slow pages', 'Prompt injection from page content', 'Screen resolution', 'Cookie size'], answer: 1, why: 'Every page the agent reads is untrusted input that can carry instructions.' },
+        { q: 'Where should a browser agent run?', options: ['On the user\'s own desktop session', 'In an isolated, disposable environment without personal credentials', 'On the production database host', 'Inside the model provider'], answer: 1, why: 'Isolation limits what an injected instruction can reach.' },
+      ],
       notes: {
         key: [
           'Computer-use agents read screenshots and act with clicks and keystrokes; browser agents act on web pages.',

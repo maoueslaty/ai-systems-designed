@@ -126,6 +126,11 @@ export const ch09: Chapter = {
     {
       id: 'building-mcp-servers', title: 'Building an MCP Server', minutes: 7, level: 'intermediate',
       summary: 'From an existing API to a production MCP server: SDKs, tool shaping, auth, deployment and testing.',
+      quiz: [
+        { q: 'How should tools on an MCP server be shaped?', options: ['One tool per REST endpoint', 'Around user tasks, few and well described', 'As many tools as possible', 'Only as resources'], answer: 1, why: 'Task-shaped tools are easier for the model to choose and call correctly.' },
+        { q: 'Which AgentCore feature can turn Lambda functions and OpenAPI specs into MCP tools without writing a server?', options: ['AgentCore Memory', 'AgentCore Gateway', 'AgentCore Browser', 'AgentCore Evaluations'], answer: 1, why: 'Gateway exposes Lambda, OpenAPI and Smithy targets as MCP tools behind one endpoint.' },
+        { q: 'A tool call needs several minutes of work. What should the server do?', options: ['Block the request until done', 'Return quickly, or use the tasks extension where supported', 'Return a stack trace', 'Ask the model to wait'], answer: 1, why: 'Long blocking calls time out; tasks let clients poll for the result.' },
+      ],
       notes: {
         key: [
           'Official SDKs exist for TypeScript, Python, Java/Kotlin, C#, Go and more; frameworks like FastMCP reduce boilerplate.',
