@@ -109,7 +109,7 @@ const so8i = sov(soAll, soAllE, [...soIn, F('v-l', 'msg', 0.7), F('l-v', 'res', 
 const so9 = sov(soNaive, soNaiveE, [...soIn, F('l-e', 'res', 0.5)], {
   widgets: [kv6('when not to bother', [['answers for people', 'plain text is fine'], ['typed tool arguments', 'strict tool use covers it'], ['huge, recursive schemas', 'split extraction into steps', 'amber'], ['fuzzy targets', 'a schema cannot fix vague tasks', 'amber']])] });
 const so10 = sov(soAll, soAllE, [...soIn, F('l-v', 'res', 0.6), F('v-e', 'res', 0.6), F('v-r', 'msg', 0.2)], {
-  widgets: [kv6('building blocks', [['Bedrock structured outputs', 'Converse outputConfig.textFormat'], ['strict tool use', '"strict": true on toolSpec'], ['validation + routing', 'Lambda, SQS, Step Functions'], ['human review', 'Amazon A2I or a review app'], ['open source', 'Pydantic, Zod, Instructor, Outlines, XGrammar']])] });
+  widgets: [kv6('building blocks', [['Bedrock structured outputs', 'Converse outputConfig.textFormat'], ['strict tool use', '"strict": true on toolSpec'], ['validation + routing', 'Lambda, SQS, Step Functions'], ['human review', 'review app + task tokens'], ['open source', 'Pydantic, Zod, Instructor, Outlines, XGrammar']])] });
 const so11 = sov(soAll, soAllE, [...soIn, F('l-v', 'res', 0.6), F('r-v', 'msg', 0.4), F('v-e', 'res', 0.6), F('v-l', 'msg', 0.2)], {
   patch: { val: pin6('schema, rules, repair', 'green', 'check') },
   widgets: [code6('recap: structured outputs', ['constrained decoding: output always parses', 'nullable fields instead of forced guesses', 'business rules in code after the schema', 'repair with the exact error, max 2 tries', 'repair re-reads the source, never adjusts', 'then a human; sample audits for silent errors'])] });
@@ -308,7 +308,7 @@ export const ch06: Chapter = {
         { short: 'When not', tag: 'insight', title: 'When structured outputs are not the fix', scene: so9, metrics: { parse: 'n/a', wrong: 'n/a', calls: 1 },
           body: ['Answers for people do not need JSON. Typed tool arguments are already covered by strict tool use.', 'Huge or recursive schemas are slower and fail more: split extraction into steps. And a schema cannot rescue a task nobody has specified.'] },
         { short: 'AWS', tag: 'aws', title: 'On AWS and in open source', scene: so10, metrics: { parse: 0, wrong: '0.3%', calls: 1.1 },
-          body: ['Bedrock structured outputs works with Converse, InvokeModel and batch inference. Validation runs in Lambda; failed documents go to a queue and a review app or Amazon A2I.', 'Open source: Pydantic or Zod for schemas and rules, Instructor for retries, Outlines or XGrammar for self-hosted constrained decoding.'] },
+          body: ['Bedrock structured outputs works with Converse, InvokeModel and batch inference. Validation runs in Lambda; failed documents go to a queue and a review app that resumes the workflow.', 'Open source: Pydantic or Zod for schemas and rules, Instructor for retries, Outlines or XGrammar for self-hosted constrained decoding.'] },
         { short: 'Recap', tag: 'recap', title: 'Recap', scene: so11, metrics: { parse: 0, wrong: '0.3%', calls: 1.1 },
           body: ['Schema mode makes outputs parse. Rules in code make them plausible. Bounded repair with the exact error fixes most of the rest, and humans plus sampled audits catch what remains.'] },
       ],
@@ -318,7 +318,7 @@ export const ch06: Chapter = {
         solution: 'Constrained decoding to a schema, business-rule validation, bounded repair with the error.',
         failure: 'Schema-valid but wrong values; repair loops that game the validator.',
         whenNot: 'Answers for people, or tasks already covered by strict tool arguments.',
-        aws: ['Bedrock structured outputs', 'Bedrock strict tool use', 'AWS Lambda', 'Amazon SQS', 'Amazon A2I'],
+        aws: ['Bedrock structured outputs', 'Bedrock strict tool use', 'AWS Lambda', 'Amazon SQS', 'Step Functions'],
         oss: ['Pydantic', 'Zod', 'Instructor', 'Outlines', 'XGrammar'],
         related: ['tool-use-loop', 'eval-harness', 'claims-fnol-journey', 'context-window-budget'],
       },

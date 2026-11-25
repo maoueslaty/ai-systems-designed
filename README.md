@@ -2,9 +2,14 @@
 
 An animated, step-by-step field guide to AI systems engineering: tokenization, embeddings, attention, LLM inference, context engineering, RAG, tool use, MCP, agents, evals, LLMOps, security, and reference architectures on AWS.
 
-Every lesson is a small isometric simulation: requests, tokens, vectors and tool calls flow through the system while the text walks through the problem, the fix and the trade-offs. Each lesson ends with **field notes**: key ideas, best practices, edge cases and notes from customer deployments (Forward Deployed Engineering).
+Every lesson is a small isometric simulation: requests, tokens, vectors and tool calls flow through the system while the text walks through the problem, the fix and the trade-offs. The guide reads as a story in four acts and an epilogue, held together by one question: what does each design do to the cost of one unit of real work?
 
-- 15 chapters, 44 lessons, 15 fully animated (134 steps), 78 glossary terms
+- **Act I–III:** how the machine works, building the system, running it for real
+- **Act IV, the pattern catalog:** 26+ AI system design patterns (routing and cascades, fallbacks, token budgets, semantic caching, permission-aware retrieval, durable agents, task-token approvals, MCP gateways, delegated identity, injection containment, canary releases, disaggregated serving, voice and document pipelines…), each pushed through its failure modes with a "Break it" toggle and a naive-vs-pattern comparison
+- **Epilogue:** a 12-lesson case study of a fictional US auto insurer, from WhatsApp intake to payment: legacy integration, access by design, guardrail layers, governance and cost per claim
+- Every lesson has a quiz; animated lessons add a senior decision record, a field scenario and pattern card; calculators for cost, KV memory, context budgets, reliability and claims economics
+- A filterable pattern catalog and a design-interview mode with graded decisions
+- 21 chapters, 78 lessons, 58 animated (558 steps), 148 glossary terms
 - Cloud diagrams use the official AWS Architecture Icons (the same set as draw.io's `mxgraph.aws4` library), inlined as vectors
 - MCP content follows the 2026-07-28 specification; OWASP content follows the 2026 LLM Top 10
 - Light and dark themes, keyboard navigation (← → R Space), Ctrl K search, progress saved locally
@@ -15,7 +20,8 @@ Every lesson is a small isometric simulation: requests, tokens, vectors and tool
 npm install
 npm run dev            # local dev server
 npm run build          # content check + typecheck + production build
-npm run check:content  # validates every scene (edges, flows, icons, spacing, glossary links)
+npm run check:content  # validates every scene (edges, flows, icons, spacing, quizzes, links)
+python3 scripts/check_overlaps.py --width 1440 --height 900   # headless label-collision check (needs a running preview)
 ```
 
 ## How content works

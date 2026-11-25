@@ -299,8 +299,8 @@ const d9 = dv(LOOP, loopE, [F('u-a', 'res', 0.6, { reverse: true, text: ['short,
   patch: { app: { state: 'warn', ...pin('optimised for clicks', 'red', 'x') }, dash: { state: 'hot', ...pin('accept 93%, cost up', 'red', 'chart') } },
   widgets: [{ type: 'kv', id: 'good', x: 0, y: 0, title: 'pair every target with a counter-metric', rows: [['acceptance', 'with reopen rate'], ['edit ratio', 'with resolution time'], ['thumbs', 'with a random human audit'], ['north star', 'cost per resolved ticket', 'green']] }] });
 const d10 = dv(LOOP, loopE, [F('a-c', 'trace', 0.5), F('sor-c', 'trace', 0.4), F('c-s', 'trace', 0.5), F('l-e', 'msg', 0.4), F('f-t', 'msg', 0.4), F('r-a', 'msg', 0.3)], {
-  patch: { sor: { kind: 'aws', aws: 'AmazonSimpleStorageService', label: 'Events (S3)' }, scrub: { kind: 'aws', aws: 'AmazonComprehend', label: 'Comprehend PII' }, lab: { kind: 'aws', aws: 'AmazonAugmentedAIA2I', label: 'A2I review' }, tune: { kind: 'aws', aws: 'AmazonBedrock', label: 'Bedrock tuning' } },
-  widgets: [{ type: 'kv', id: 'aws', x: 0, y: 0, title: 'AWS and open source', rows: [['events', 'S3 + Athena'], ['PII', 'Comprehend, Macie'], ['labelling', 'A2I, SageMaker Ground Truth'], ['tuning', 'Bedrock fine-tuning, RFT, distillation'], ['open source', 'Langfuse, Argilla, Label Studio, Presidio']] }] });
+  patch: { sor: { kind: 'aws', aws: 'AmazonSimpleStorageService', label: 'Events (S3)' }, scrub: { kind: 'aws', aws: 'AmazonComprehend', label: 'Comprehend PII' }, tune: { kind: 'aws', aws: 'AmazonBedrock', label: 'Bedrock tuning' } },
+  widgets: [{ type: 'kv', id: 'aws', x: 0, y: 0, title: 'AWS and open source', rows: [['events', 'S3 + Athena'], ['PII', 'Comprehend, Macie'], ['labelling', 'review app on Step Functions task tokens'], ['tuning', 'Bedrock fine-tuning, RFT, distillation'], ['open source', 'Langfuse, Argilla, Label Studio, Presidio']] }] });
 const d11 = dv(LOOP, loopE, [F('u-a', 'res', 0.5, { reverse: true }), F('a-c', 'trace', 0.5), F('c-s', 'trace', 0.5), F('t-l', 'msg', 0.4), F('l-e', 'msg', 0.4), F('r-a', 'msg', 0.4), F('a-d', 'trace', 0.4)], {
   patch: { dash: pin('the north star', 'amber', 'chart') } });
 
@@ -638,7 +638,7 @@ export const patternsTrust: Chapter = {
         { short: 'Goodhart', tag: 'tradeoff', title: 'Goodhart: the metric becomes the target', scene: d9, metrics: { accept: '93%', cpo: '1.95 USD', cycle: '3 weeks' },
           body: ['Reward acceptance and the model learns to write short, bland drafts that agents send unread. Acceptance hits 93%; reopens and cost per resolved ticket rise.', 'Pair every target with a counter-metric, keep a frozen holdout cohort, and make the north star an outcome, not a click.'] },
         { short: 'AWS', tag: 'aws', title: 'On AWS, and in open source', scene: d10, metrics: { accept: '80%', cpo: '1.60 USD', cycle: '3 weeks' },
-          body: ['Events land in S3 and are queried with Athena. Comprehend and Macie find PII. A2I and SageMaker Ground Truth run labelling. Bedrock fine-tuning, reinforcement fine-tuning and distillation produce the candidate.', 'Open source: Langfuse for feedback scores, Argilla or Label Studio for labelling, Presidio for PII.'] },
+          body: ['Events land in S3 and are queried with Athena. Comprehend and Macie find PII. A small review app, driven by Step Functions task tokens, runs labelling (SageMaker A2I and Ground Truth no longer take new customers). Bedrock fine-tuning, reinforcement fine-tuning and distillation produce the candidate.', 'Open source: Langfuse for feedback scores, Argilla or Label Studio for labelling, Presidio for PII.'] },
         { short: 'Recap', tag: 'recap', title: 'A loop with an owner and a number', scene: d11, metrics: { accept: '80%', cpo: '1.60 USD', cycle: '3 weeks' },
           body: ['Capture, scrub, triage, label, split, release, measure. Most turns end in a prompt or retrieval fix, not a fine-tune.', 'Skip the full loop at low volume or without outcome data: review a weekly sample by hand. Either way, one owner and one number: cost per resolved outcome.'] },
       ],
@@ -648,7 +648,7 @@ export const patternsTrust: Chapter = {
         solution: 'Capture edits, ratings and outcomes; triage by cost; label into eval and tuning sets; release; measure.',
         failure: 'Biased feedback, PII in training data, and Goodhart: optimising the proxy instead of the outcome.',
         whenNot: 'Low volume or no outcome signal: review samples by hand and fix prompts.',
-        aws: ['Amazon S3', 'Amazon Athena', 'Amazon Comprehend', 'Amazon Macie', 'Amazon A2I', 'SageMaker Ground Truth', 'Bedrock fine-tuning and RFT'],
+        aws: ['Amazon S3', 'Amazon Athena', 'Amazon Comprehend', 'Amazon Macie', 'Step Functions task tokens', 'Bedrock fine-tuning and RFT'],
         oss: ['Langfuse', 'Argilla', 'Label Studio', 'Presidio'],
         related: ['eval-harness', 'fine-tuning-ops', 'shadow-canary-releases', 'cost-control'],
       },
@@ -696,7 +696,7 @@ export const patternsTrust: Chapter = {
           { t: 'NVIDIA: data flywheel blueprint', u: 'https://developer.nvidia.com/blog/build-efficient-ai-agents-through-model-distillation-with-nvidias-data-flywheel-blueprint' },
           { t: 'Amazon Bedrock reinforcement fine-tuning', u: 'https://aws.amazon.com/about-aws/whats-new/2025/12/bedrock-reinforcement-fine-tuning-66-base-models' },
           { t: 'Amazon Comprehend: PII detection', u: 'https://docs.aws.amazon.com/comprehend/latest/dg/how-pii.html' },
-          { t: 'Amazon Augmented AI (A2I)', u: 'https://docs.aws.amazon.com/sagemaker/latest/dg/a2i-use-augmented-ai-a2i-human-review-loops.html' },
+          { t: 'AWS service availability updates (A2I, Ground Truth in maintenance)', u: 'https://aws.amazon.com/about-aws/whats-new/2026/06/aws-service-availability/' },
         ],
       },
     },
