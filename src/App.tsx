@@ -363,7 +363,10 @@ export default function App() {
         <div className="spacer" />
         <button className="searchbtn" onClick={() => setSearch(true)} aria-label="Search"><Icon g="search" size={15} /><span>Search lessons and terms</span><kbd>Ctrl K</kbd></button>
         <button className="iconbtn" onClick={toggle} title="Toggle theme" aria-label="Toggle theme"><Icon g={theme === 'dark' ? 'sun' : 'moon'} size={17} /></button>
-        <a className="author" href="#/about">by {AUTHOR.name}</a>
+        <a className="author" href="#/about" title="About the author">by {AUTHOR.name}</a>
+        <a className="iconbtn linkedin" href={AUTHOR.linkedin} target="_blank" rel="noreferrer" title="LinkedIn profile" aria-label={`${AUTHOR.name} on LinkedIn (opens in a new tab)`}>
+          <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.34V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28ZM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13ZM7.12 20.45H3.56V9h3.56v11.45ZM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.73C24 .77 23.2 0 22.22 0Z"/></svg>
+        </a>
       </header>
       <div className={`main ${right ? '' : 'no-right'} ${side ? '' : 'side-closed'}`}>
         <Sidebar current={found?.lesson.id} progress={progress} open={menu} />
